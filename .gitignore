@@ -125,3 +125,6 @@ libsql
 test_libsql_f16_table.h
 test_libsql_f16
 >>>>>>> 9fb4be2 (initial commit)
+
+bld/
+.venv

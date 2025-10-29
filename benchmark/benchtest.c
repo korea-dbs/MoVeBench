@@ -1,5 +1,5 @@
-#include "../parse.h"
-#include "../opcodes.h"
+#include "parse.h"
+#include "opcodes.h"
 #include "../src/sqliteInt.h"
 #include "assert.h"
 #include "stdbool.h"
