@@ -128,3 +128,4 @@ test_libsql_f16
 
 bld/
 .venv
+pkgIndex.tcl
