@@ -87,6 +87,7 @@ def main():
     insert_file = os.path.join(args.outdir, f"insert_{args.n}_sift.sql")
     print(f"Writing {insert_file}...", file=sys.stderr)
     with open(insert_file, 'w') as f:
+        f.write(f"PRAGMA journal_mode=WAL;\n")
         f.write(f"CREATE TABLE x(id INTEGER PRIMARY KEY, embedding FLOAT32({dim}));\n")
         f.write(f"CREATE INDEX x_idx ON x(libsql_vector_idx(embedding, 'metric=l2', 'compress_neighbors=float8', 'max_neighbors=20'));\n")
         for i, vec in enumerate(base_vecs):

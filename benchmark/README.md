@@ -118,7 +118,7 @@ python3 libsql_test_recall.py \
   --query-sql dataset/query10k_glove.sql \
   --groundtruth dataset/groundtruth_10k_k10_glove.txt \
   --shell ../sqlite3 \
-  --db /mnt/nvme0/libsql_test_recall.db \
+  --db /mnt/nvme0/libsql_test_recall_glove.db \
   --k 10
 ```
 
@@ -193,4 +193,13 @@ This generates:
   2. `dataset/query_{q}_sift.sql`    - vector_top_k queries
   3. `dataset/groundtruth_{q}_sift.txt` - groundtruth neighbor IDs (from .ivecs)
 
-
+After generate, run:
+```
+python3 libsql_test_recall.py \
+  --insert-sql dataset/insert_100000_sift.sql \
+  --query-sql dataset/query_10000_sift.sql \
+  --groundtruth dataset/groundtruth_10000_k10_sift.txt \
+  --shell ../sqlite3 \
+  --db /mnt/nvme0/libsql_test_recall_sift.db \
+  --k 10
+```
