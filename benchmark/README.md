@@ -127,19 +127,19 @@ Skip insert if DB already built:
 python3 libsql_test_recall.py \
   --load-db /mnt/nvme0/{db_name} \
   --query-sql dataset/query10k_glove.sql \
-  --shell ../sqlite4 \
+  --shell ../sqlite3 \
   --k 10
 ```
 
 #### Mode 2: Random vectors (insert random vectors)
 
 ```
-python3 libsql_test_recall.py --shell ../sqlite4 --dim 1024 --n 5000 --k 10 --q 100
+python3 libsql_test_recall.py --shell ../sqlite3 --dim 1024 --n 5000 --k 10 --q 100
 ```
 
 With compression:
 ```
-python3 libsql_test_recall.py --shell ../sqlite4 --dim 1024 --n 5000 --k 10 --q 100 \
+python3 libsql_test_recall.py --shell ../sqlite3 --dim 1024 --n 5000 --k 10 --q 100 \
   --compress float8 --max-neighbors 20
 ```
 
@@ -151,7 +151,7 @@ python3 libsql_test_recall.py --shell ../sqlite4 --dim 1024 --n 5000 --k 10 --q 
 | `--n` | 1000 | Number of data vectors to insert |
 | `--k` | 10 | Top-k neighbors to retrieve |
 | `--q` | 100 | Number of query vectors |
-| `--shell` | `../sqlite4` | Path to sqlite4/sqlite3 shell binary |
+| `--shell` | `../sqlite3` | Path to sqlite3 shell binary |
 | `--db` | `test_recall.db` | Database file path |
 | `--sqldir` | `sql_recall` | Directory to save/reuse generated SQL files |
 | `--compress` | None | Compress neighbors: `float32`, `float16`, `float8`, `float1bit` |
@@ -176,7 +176,7 @@ GloVe datasets are in the `lsm_2/benchmark/dataset`
 Generated from `wiki_giga_2024_200_MFT20_vectors_seed_2024_alpha_0.75_eta_0.05_combined.txt` (1.29M word vectors, 200 dimensions).
 
 ---
-**To Convert SIFT1M dataset to SQL files for sqlite4_libsql benchmark**
+**To Convert SIFT1M dataset to SQL files for sqlite3_libsql benchmark**
 
 Download first:
 ```
