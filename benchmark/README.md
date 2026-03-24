@@ -90,3 +90,107 @@ blob table: ready to prepare
 blob table: prepared
 time: 0.31 micros (avg.), 1000 (count)
 ```
+
+
+---
+## [DBS] sqlite3 libsql Recall Benchmark
+
+### How To Use
+
+1. Build sqlite3 libsql:
+    ```
+    ./configure 
+    make -j
+    ```
+
+2. goto benchmark dir:
+    ```
+    cd benchmark
+    ```
+
+#### Mode 1: Pre-made SQL files (GloVe dataset)
+
+Use pre-made insert/query SQL files from `dataset/`:
+
+```
+python3 libsql_test_recall.py \
+  --insert-sql dataset/insert100k_glove.sql \
+  --query-sql dataset/query10k_glove.sql \
+  --groundtruth dataset/groundtruth_10k_k10_glove.txt \
+  --shell ../sqlite3 \
+  --db /mnt/nvme0/libsql_test_recall.db \
+  --k 10
+```
+
+Skip insert if DB already built:
+```
+python3 libsql_test_recall.py \
+  --load-db /mnt/nvme0/{db_name} \
+  --query-sql dataset/query10k_glove.sql \
+  --shell ../sqlite4 \
+  --k 10
+```
+
+#### Mode 2: Random vectors (insert random vectors)
+
+```
+python3 libsql_test_recall.py --shell ../sqlite4 --dim 1024 --n 5000 --k 10 --q 100
+```
+
+With compression:
+```
+python3 libsql_test_recall.py --shell ../sqlite4 --dim 1024 --n 5000 --k 10 --q 100 \
+  --compress float8 --max-neighbors 20
+```
+
+### Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--dim` | 64 | Vector dimension |
+| `--n` | 1000 | Number of data vectors to insert |
+| `--k` | 10 | Top-k neighbors to retrieve |
+| `--q` | 100 | Number of query vectors |
+| `--shell` | `../sqlite4` | Path to sqlite4/sqlite3 shell binary |
+| `--db` | `test_recall.db` | Database file path |
+| `--sqldir` | `sql_recall` | Directory to save/reuse generated SQL files |
+| `--compress` | None | Compress neighbors: `float32`, `float16`, `float8`, `float1bit` |
+| `--max-neighbors` | None | Max neighbors for DiskANN index |
+| `--tx` | 100 | Rows per transaction (1 = autocommit) |
+| `--save-insert` | off | Save insert SQL to sqldir for reuse |
+| `--load-db` | None | Path to existing DB file (skips insert step) |
+| `--insert-sql` | None | Pre-made insert SQL file |
+| `--query-sql` | None | Pre-made query SQL file |
+| `--vecfile` | None | Vector text file (word vec1 vec2 ... per line) |
+| `--seed` | 42 | Random seed |
+
+---
+## Dataset
+
+GloVe datasets are in the `lsm_2/benchmark/dataset`
+
+- `insert100k_glove.sql` - 100K inserts, 200-dim word vectors from GloVe dataset
+- `query10k_glove.sql` - 10K vector_top_k queries (k=10)
+- `groundtruth_10k_k10_glove.txt` - ground truth for the `query10k_glove.sql`
+
+Generated from `wiki_giga_2024_200_MFT20_vectors_seed_2024_alpha_0.75_eta_0.05_combined.txt` (1.29M word vectors, 200 dimensions).
+
+---
+**To Convert SIFT1M dataset to SQL files for sqlite4_libsql benchmark**
+
+Download first:
+```
+  wget ftp://ftp.irisa.fr/local/texmex/corpus/sift.tar.gz
+  tar xzf sift.tar.gz
+```
+Usage:
+```
+  python3 sift1m_to_sql.py --sift-dir sift --n 100000 --q 10000 --k 10 --outdir dataset
+```
+This generates:
+
+  1. `dataset/insert_{n}_sift.sql`   - INSERT statements
+  2. `dataset/query_{q}_sift.sql`    - vector_top_k queries
+  3. `dataset/groundtruth_{q}_sift.txt` - groundtruth neighbor IDs (from .ivecs)
+
+
