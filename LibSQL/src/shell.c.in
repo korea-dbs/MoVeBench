@@ -319,6 +319,14 @@ static sqlite3_int64 timeOfDay(void){
   return t;
 }
 
+static double gShellExecMs = 0.0;
+static double gShellPrepareMs = 0.0;
+static double gShellStepMs = 0.0;
+static double gShellFinalizeMs = 0.0;
+static int gShellStmtCount = 0;
+
+extern void sqlite3_step_timing_report(void);
+
 #if !defined(_WIN32) && !defined(WIN32) && !defined(__minux)
 #include <sys/time.h>
 #include <sys/resource.h>
@@ -4197,6 +4205,7 @@ static int shell_exec(
   int rc2;
   const char *zLeftover;          /* Tail of unprocessed SQL */
   sqlite3 *db = pArg->db;
+  double shellExecStartMs = (double)timeOfDay();
 
   if( pzErrMsg ){
     *pzErrMsg = NULL;
@@ -4211,7 +4220,9 @@ static int shell_exec(
 
   while( zSql[0] && (SQLITE_OK == rc) ){
     static const char *zStmtSql;
+    double t0 = (double)timeOfDay();
     rc = sqlite3_prepare_v2(db, zSql, -1, &pStmt, &zLeftover);
+    gShellPrepareMs += (double)timeOfDay() - t0;
     if( SQLITE_OK != rc ){
       if( pzErrMsg ){
         *pzErrMsg = save_err_msg(db, "in prepare", rc, zSql);
@@ -4223,6 +4234,7 @@ static int shell_exec(
         while( IsSpace(zSql[0]) ) zSql++;
         continue;
       }
+      gShellStmtCount++;
       zStmtSql = sqlite3_sql(pStmt);
       if( zStmtSql==0 ) zStmtSql = "";
       while( IsSpace(zStmtSql[0]) ) zStmtSql++;
@@ -4296,7 +4308,9 @@ static int shell_exec(
       }
 
       bind_prepared_stmt(pArg, pStmt);
+      t0 = (double)timeOfDay();
       exec_prepared_stmt(pArg, pStmt);
+      gShellStepMs += (double)timeOfDay() - t0;
       explain_data_delete(pArg);
       eqp_render(pArg, 0);
 
@@ -4313,7 +4327,9 @@ static int shell_exec(
       /* Finalize the statement just executed. If this fails, save a
       ** copy of the error message. Otherwise, set zSql to point to the
       ** next statement to execute. */
+      t0 = (double)timeOfDay();
       rc2 = sqlite3_finalize(pStmt);
+      gShellFinalizeMs += (double)timeOfDay() - t0;
       if( rc!=SQLITE_NOMEM ) rc = rc2;
       if( rc==SQLITE_OK ){
         zSql = zLeftover;
@@ -4329,6 +4345,7 @@ static int shell_exec(
     }
   } /* end while */
 
+  gShellExecMs += (double)timeOfDay() - shellExecStartMs;
   return rc;
 }
 
@@ -5473,7 +5490,21 @@ static void open_db(ShellState *p, int openFlags){
 ** Attempt to close the database connection.  Report errors.
 */
 void close_db(sqlite3 *db){
-  int rc = sqlite3_close(db);
+  sqlite3_int64 t0;
+  int rc;
+  double shellOtherMs;
+  if( db==0 ) return;
+  t0 = timeOfDay();
+  rc = sqlite3_close(db);
+  shellOtherMs = gShellExecMs - gShellPrepareMs - gShellStepMs - gShellFinalizeMs;
+  if( shellOtherMs<0.0 ) shellOtherMs = 0.0;
+  eputf("shell statements: %d\n", gShellStmtCount);
+  eputf("shell prepare: %.1f ms\n", gShellPrepareMs);
+  eputf("shell step: %.1f ms\n", gShellStepMs);
+  eputf("shell finalize: %.1f ms\n", gShellFinalizeMs);
+  eputf("shell other: %.1f ms\n", shellOtherMs);
+  sqlite3_step_timing_report();
+  eputf("shell db close: %.1f ms\n", (double)(timeOfDay() - t0));
   if( rc ){
     eputf("Error: sqlite3_close() returns %d: %s\n", rc, sqlite3_errmsg(db));
   }

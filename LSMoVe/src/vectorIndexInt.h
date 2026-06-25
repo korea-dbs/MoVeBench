@@ -45,10 +45,16 @@ struct DiskAnnIndex {
   double totalPass1Ms;       /* pass1: add edges to new node */
   double totalPass2Ms;       /* pass2: update neighbor edges + their flush */
   double totalNewFlushMs;    /* flush new node's blob */
-  double totalBuildReadMs;   /* index build read I/O */
-  double totalBuildWriteMs;  /* index build write I/O */
+  double totalBuildReadMs;   /* index build KV read path */
+  double totalBuildWriteMs;  /* index build KV write path */
   double totalBuildDistMs;   /* index build distance compute */
   double totalBuildLsmMs;    /* LSM work during index build */
+  long long totalPass2Visited;       /* existing nodes considered for rewrite */
+  long long totalPass2EdgeUpdates;   /* existing nodes whose edge list changed */
+  long long totalExistingFlushes;    /* flushes of existing node blobs */
+  long long totalExistingFlushBytes; /* bytes flushed for existing node blobs */
+  long long totalNewFlushes;         /* flushes of newly inserted node blobs */
+  long long totalNewFlushBytes;      /* bytes flushed for newly inserted node blobs */
 };
 
 /*
@@ -75,6 +81,12 @@ int blobSpotCreate(const DiskAnnIndex *pIndex, BlobSpot **ppBlobSpot, u64 nRowid
 int blobSpotReload(DiskAnnIndex *pIndex, BlobSpot *pBlobSpot, u64 nRowid, int nBufferSize);
 int blobSpotFlush(DiskAnnIndex *pIndex, BlobSpot *pBlobSpot);
 void blobSpotFree(BlobSpot *pBlobSpot);
+void diskAnnRecordInsertStmt(double ms);
+void diskAnnRecordInsertOther(double ms);
+void diskAnnRecordInsertFinish(double ms);
+void diskAnnRecordIndexBuildTotal(double ms);
+void diskAnnRecordVectorSearch(double totalMs, double parseMs, double lookupMs,
+                               double diskAnnMs, double closeMs);
 
 /*
  * Accessor for node binary format

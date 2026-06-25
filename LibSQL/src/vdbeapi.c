@@ -16,6 +16,53 @@
 #include "sqliteInt.h"
 #include "vdbeInt.h"
 #include "opcodes.h"
+#include <sys/time.h>
+
+static double sqlite3StepTimingNowMs(void){
+  struct timeval tv;
+  gettimeofday(&tv, 0);
+  return (double)tv.tv_sec * 1000.0 + (double)tv.tv_usec / 1000.0;
+}
+
+static int gStepTimingDepth = 0;
+static double gStepApiMs = 0.0;
+static double gStepCoreMs = 0.0;
+static double gStepMutexEnterMs = 0.0;
+static double gStepMutexLeaveMs = 0.0;
+static double gStepAutoResetMs = 0.0;
+static double gStepReadyMs = 0.0;
+static double gStepListMs = 0.0;
+static double gStepExecMs = 0.0;
+static double gStepProfileMs = 0.0;
+static double gStepWalMs = 0.0;
+static double gStepTransferMs = 0.0;
+static double gStepApiExitMs = 0.0;
+static double gStepReprepareMs = 0.0;
+static double gStepResetMs = 0.0;
+static int gStepTopCount = 0;
+
+void sqlite3_step_timing_report(void){
+  double known = gStepCoreMs + gStepMutexEnterMs + gStepMutexLeaveMs
+               + gStepReprepareMs + gStepResetMs;
+  double other = gStepApiMs - known;
+  if( other<0.0 ) other = 0.0;
+  fprintf(stderr, "step top-level calls: %d\n", gStepTopCount);
+  fprintf(stderr, "step api total: %.1f ms\n", gStepApiMs);
+  fprintf(stderr, "step core total: %.1f ms\n", gStepCoreMs);
+  fprintf(stderr, "step mutex enter: %.1f ms\n", gStepMutexEnterMs);
+  fprintf(stderr, "step mutex leave: %.1f ms\n", gStepMutexLeaveMs);
+  fprintf(stderr, "step auto reset: %.1f ms\n", gStepAutoResetMs);
+  fprintf(stderr, "step ready setup: %.1f ms\n", gStepReadyMs);
+  fprintf(stderr, "step vdbe list: %.1f ms\n", gStepListMs);
+  fprintf(stderr, "step vdbe exec: %.1f ms\n", gStepExecMs);
+  fprintf(stderr, "step profile: %.1f ms\n", gStepProfileMs);
+  fprintf(stderr, "step wal callback: %.1f ms\n", gStepWalMs);
+  fprintf(stderr, "step transfer error: %.1f ms\n", gStepTransferMs);
+  fprintf(stderr, "step api exit: %.1f ms\n", gStepApiExitMs);
+  fprintf(stderr, "step reprepare: %.1f ms\n", gStepReprepareMs);
+  fprintf(stderr, "step reset: %.1f ms\n", gStepResetMs);
+  fprintf(stderr, "step wrapper other: %.1f ms\n", other);
+}
 
 #ifndef SQLITE_OMIT_DEPRECATED
 /*
@@ -754,12 +801,16 @@ static int doWalCallbacks(sqlite3 *db){
 static int sqlite3Step(Vdbe *p){
   sqlite3 *db;
   int rc;
+  int isTopLevel = (gStepTimingDepth==1);
+  double stepCoreStartMs = isTopLevel ? sqlite3StepTimingNowMs() : 0.0;
+  double t0;
 
   assert(p);
   db = p->db;
   if( p->eVdbeState!=VDBE_RUN_STATE ){
     restart_step:
-    if( p->eVdbeState==VDBE_READY_STATE ){
+      if( p->eVdbeState==VDBE_READY_STATE ){
+      t0 = isTopLevel ? sqlite3StepTimingNowMs() : 0.0;
       if( p->expired ){
         p->rc = SQLITE_SCHEMA;
         rc = SQLITE_ERROR;
@@ -770,6 +821,7 @@ static int sqlite3Step(Vdbe *p){
           ** value.
           */
           rc = sqlite3VdbeTransferError(p);
+          if( isTopLevel ) gStepTransferMs += sqlite3StepTimingNowMs() - t0;
         }
         goto end_of_step;
       }
@@ -800,6 +852,7 @@ static int sqlite3Step(Vdbe *p){
       if( p->bIsReader ) db->nVdbeRead++;
       p->pc = 0;
       p->eVdbeState = VDBE_RUN_STATE;
+      if( isTopLevel ) gStepReadyMs += sqlite3StepTimingNowMs() - t0;
     }else
 
     if( ALWAYS(p->eVdbeState==VDBE_HALT_STATE) ){
@@ -821,12 +874,16 @@ static int sqlite3Step(Vdbe *p){
       */
 #ifdef SQLITE_OMIT_AUTORESET
       if( (rc = p->rc&0xff)==SQLITE_BUSY || rc==SQLITE_LOCKED ){
+        t0 = isTopLevel ? sqlite3StepTimingNowMs() : 0.0;
         sqlite3_reset((sqlite3_stmt*)p);
+        if( isTopLevel ) gStepAutoResetMs += sqlite3StepTimingNowMs() - t0;
       }else{
         return SQLITE_MISUSE_BKPT;
       }
 #else
+      t0 = isTopLevel ? sqlite3StepTimingNowMs() : 0.0;
       sqlite3_reset((sqlite3_stmt*)p);
+      if( isTopLevel ) gStepAutoResetMs += sqlite3StepTimingNowMs() - t0;
 #endif
       assert( p->eVdbeState==VDBE_READY_STATE );
       goto restart_step;
@@ -838,29 +895,38 @@ static int sqlite3Step(Vdbe *p){
 #endif
 #ifndef SQLITE_OMIT_EXPLAIN
   if( p->explain ){
+    t0 = isTopLevel ? sqlite3StepTimingNowMs() : 0.0;
     rc = sqlite3VdbeList(p);
+    if( isTopLevel ) gStepListMs += sqlite3StepTimingNowMs() - t0;
   }else
 #endif /* SQLITE_OMIT_EXPLAIN */
   {
+    t0 = isTopLevel ? sqlite3StepTimingNowMs() : 0.0;
     db->nVdbeExec++;
     rc = sqlite3VdbeExec(p);
     db->nVdbeExec--;
+    if( isTopLevel ) gStepExecMs += sqlite3StepTimingNowMs() - t0;
   }
 
   if( rc==SQLITE_ROW ){
     assert( p->rc==SQLITE_OK );
     assert( db->mallocFailed==0 );
     db->errCode = SQLITE_ROW;
+    if( isTopLevel ) gStepCoreMs += sqlite3StepTimingNowMs() - stepCoreStartMs;
     return SQLITE_ROW;
   }else{
 #ifndef SQLITE_OMIT_TRACE
     /* If the statement completed successfully, invoke the profile callback */
+    t0 = isTopLevel ? sqlite3StepTimingNowMs() : 0.0;
     checkProfileCallback(db, p);
+    if( isTopLevel ) gStepProfileMs += sqlite3StepTimingNowMs() - t0;
 #endif
     p->pResultRow = 0;
     if( rc==SQLITE_DONE && db->autoCommit ){
       assert( p->rc==SQLITE_OK );
+      t0 = isTopLevel ? sqlite3StepTimingNowMs() : 0.0;
       p->rc = doWalCallbacks(db);
+      if( isTopLevel ) gStepWalMs += sqlite3StepTimingNowMs() - t0;
       if( p->rc!=SQLITE_OK ){
         rc = SQLITE_ERROR;
       }
@@ -869,16 +935,21 @@ static int sqlite3Step(Vdbe *p){
       ** error has occurred, then return the error code in p->rc to the
       ** caller. Set the error code in the database handle to the same value.
       */
+      t0 = isTopLevel ? sqlite3StepTimingNowMs() : 0.0;
       rc = sqlite3VdbeTransferError(p);
+      if( isTopLevel ) gStepTransferMs += sqlite3StepTimingNowMs() - t0;
     }
   }
 
   db->errCode = rc;
+  t0 = isTopLevel ? sqlite3StepTimingNowMs() : 0.0;
   if( SQLITE_NOMEM==sqlite3ApiExit(p->db, p->rc) ){
     p->rc = SQLITE_NOMEM_BKPT;
     if( (p->prepFlags & SQLITE_PREPARE_SAVESQL)!=0 ) rc = p->rc;
   }
+  if( isTopLevel ) gStepApiExitMs += sqlite3StepTimingNowMs() - t0;
 end_of_step:
+  if( isTopLevel ) gStepCoreMs += sqlite3StepTimingNowMs() - stepCoreStartMs;
   /* There are only a limited number of result codes allowed from the
   ** statements prepared using the legacy sqlite3_prepare() interface */
   assert( (p->prepFlags & SQLITE_PREPARE_SAVESQL)!=0
@@ -910,6 +981,9 @@ int sqlite3_step(sqlite3_stmt *pStmt){
   Vdbe *v = (Vdbe*)pStmt;  /* the prepared statement */
   int cnt = 0;             /* Counter to prevent infinite loop of reprepares */
   sqlite3 *db;             /* The database connection */
+  int isTopLevel = (gStepTimingDepth==0);
+  double apiStartMs = isTopLevel ? sqlite3StepTimingNowMs() : 0.0;
+  double t0;
 
   if( vdbeSafetyNotNull(v) ){
     return SQLITE_MISUSE_BKPT;
@@ -921,11 +995,19 @@ int sqlite3_step(sqlite3_stmt *pStmt){
     db->errCode = rc;
     return rc;
   }
+  t0 = isTopLevel ? sqlite3StepTimingNowMs() : 0.0;
   sqlite3_mutex_enter(db->mutex);
+  if( isTopLevel ){
+    gStepMutexEnterMs += sqlite3StepTimingNowMs() - t0;
+    gStepTopCount++;
+  }
+  gStepTimingDepth++;
   while( (rc = sqlite3Step(v))==SQLITE_SCHEMA
          && cnt++ < SQLITE_MAX_SCHEMA_RETRY ){
     int savedPc = v->pc;
+    t0 = isTopLevel ? sqlite3StepTimingNowMs() : 0.0;
     rc = sqlite3Reprepare(v);
+    if( isTopLevel ) gStepReprepareMs += sqlite3StepTimingNowMs() - t0;
     if( rc!=SQLITE_OK ){
       /* This case occurs after failing to recompile an sql statement.
       ** The error message from the SQL compiler has already been loaded
@@ -946,7 +1028,9 @@ int sqlite3_step(sqlite3_stmt *pStmt){
       }
       break;
     }
+    t0 = isTopLevel ? sqlite3StepTimingNowMs() : 0.0;
     sqlite3_reset(pStmt);
+    if( isTopLevel ) gStepResetMs += sqlite3StepTimingNowMs() - t0;
     if( savedPc>=0 ){
       /* Setting minWriteFileFormat to 254 is a signal to the OP_Init and
       ** OP_Trace opcodes to *not* perform SQLITE_TRACE_STMT because it has
@@ -956,7 +1040,13 @@ int sqlite3_step(sqlite3_stmt *pStmt){
     }
     assert( v->expired==0 );
   }
+  gStepTimingDepth--;
+  t0 = isTopLevel ? sqlite3StepTimingNowMs() : 0.0;
   sqlite3_mutex_leave(db->mutex);
+  if( isTopLevel ){
+    gStepMutexLeaveMs += sqlite3StepTimingNowMs() - t0;
+    gStepApiMs += sqlite3StepTimingNowMs() - apiStartMs;
+  }
   return rc;
 }
 

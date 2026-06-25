@@ -5,11 +5,20 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/time.h>
 #include "sqlite4.h"
 
 #define MAX_LINE 65536
 
 static int gHasError = 0;
+
+extern void sqlite4_shell_timing_report(void);
+
+static double shell_now_ms(void) {
+    struct timeval tv;
+    gettimeofday(&tv, 0);
+    return (double)tv.tv_sec * 1000.0 + (double)tv.tv_usec / 1000.0;
+}
 
 static int callback(void *pArg, int nCol, sqlite4_value **apVal, const char **azCol) {
     int i;
@@ -132,6 +141,11 @@ int main(int argc, char **argv) {
     /* Run any remaining input */
     if (accum[0] && !gHasError) run_sql(db, accum);
 
-    sqlite4_close(db, 0);
+    sqlite4_shell_timing_report();
+    {
+        double t0 = shell_now_ms();
+        sqlite4_close(db, 0);
+        fprintf(stderr, "shell db close: %.1f ms\n", shell_now_ms() - t0);
+    }
     return gHasError ? 1 : 0;
 }

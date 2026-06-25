@@ -29,6 +29,13 @@
 #include "vdbeInt.h"
 #include "sqliteInt.h"
 #include "vectorIndexInt.h"
+#include <sys/time.h>
+
+static double diskAnnVectorIndexNowMs(void){
+  struct timeval tv;
+  gettimeofday(&tv, 0);
+  return (double)tv.tv_sec*1000.0 + (double)tv.tv_usec/1000.0;
+}
 
 /*
  * The code which glue SQLite internals with pure DiskANN implementation resides here
@@ -994,6 +1001,10 @@ int vectorIndexSearch(
   Index *pIndex;
   VectorIdxKey pKey;
   VectorIdxParams idxParams;
+  double totalStartMs = diskAnnVectorIndexNowMs();
+  double parseStartMs = 0.0, lookupStartMs = 0.0, diskAnnStartMs = 0.0;
+  double closeStartMs = 0.0;
+  double parseMs = 0.0, lookupMs = 0.0, diskAnnMs = 0.0, closeMs = 0.0;
   vectorIdxParamsInit(&idxParams, NULL, 0);
 
   if( argc != 3 ){
@@ -1001,6 +1012,7 @@ int vectorIndexSearch(
     rc = SQLITE_ERROR;
     goto out;
   }
+  parseStartMs = diskAnnVectorIndexNowMs();
   if( detectVectorParameters(argv[1], VECTOR_TYPE_FLOAT32, &type, &dims, pzErrMsg) != 0 ){
     rc = SQLITE_ERROR;
     goto out;
@@ -1040,7 +1052,9 @@ int vectorIndexSearch(
     rc = SQLITE_ERROR;
     goto out;
   }
+  parseMs += diskAnnVectorIndexNowMs() - parseStartMs;
 
+  lookupStartMs = diskAnnVectorIndexNowMs();
   if( sqlite3_value_type(argv[0]) != SQLITE_TEXT ){
     *pzErrMsg = sqlite3_mprintf("vector index(search): first parameter (index) must be a string");
     rc = SQLITE_ERROR;
@@ -1094,8 +1108,12 @@ int vectorIndexSearch(
     rc = SQLITE_ERROR;
     goto out;
   }
+  lookupMs += diskAnnVectorIndexNowMs() - lookupStartMs;
+  diskAnnStartMs = diskAnnVectorIndexNowMs();
   rc = diskAnnSearch(pDiskAnn, pVector, k, &pKey, pRows, pzErrMsg);
+  diskAnnMs += diskAnnVectorIndexNowMs() - diskAnnStartMs;
 out:
+  closeStartMs = diskAnnVectorIndexNowMs();
   if( pDiskAnn != NULL ){
     *nReads += pDiskAnn->nReads;
     *nWrites += pDiskAnn->nWrites;
@@ -1109,6 +1127,11 @@ out:
   if( iDb >= 0 && iDb != 1 ){
     sqlite3BtreeLeave(db->aDb[iDb].pBt);
   }
+  closeMs += diskAnnVectorIndexNowMs() - closeStartMs;
+  diskAnnRecordVectorSearch(
+      diskAnnVectorIndexNowMs() - totalStartMs, parseMs, lookupMs,
+      diskAnnMs, closeMs
+  );
   return rc;
 }
 
@@ -1119,16 +1142,22 @@ int vectorIndexInsert(
 ){
   int rc;
   VectorInRow vectorInRow;
+  double indexBuildStartMs;
 
+  indexBuildStartMs = diskAnnVectorIndexNowMs();
   rc = vectorInRowAlloc(pCur->db, pRecord, &vectorInRow, pzErrMsg);
   if( rc != SQLITE_OK ){
+    diskAnnRecordIndexBuildTotal(diskAnnVectorIndexNowMs() - indexBuildStartMs);
     return rc;
   }
   if( vectorInRow.pVector == NULL ){
+    vectorInRowFree(pCur->db, &vectorInRow);
+    diskAnnRecordIndexBuildTotal(diskAnnVectorIndexNowMs() - indexBuildStartMs);
     return SQLITE_OK;
   }
   rc = diskAnnInsert(pCur->pIndex, &vectorInRow, pzErrMsg);
   vectorInRowFree(pCur->db, &vectorInRow);
+  diskAnnRecordIndexBuildTotal(diskAnnVectorIndexNowMs() - indexBuildStartMs);
   return rc;
 }
 

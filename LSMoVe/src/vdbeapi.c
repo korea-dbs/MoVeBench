@@ -15,6 +15,52 @@
 */
 #include "sqliteInt.h"
 #include "vdbeInt.h"
+#include <sys/time.h>
+
+static double sqlite4StepTimingNowMs(void){
+  struct timeval tv;
+  gettimeofday(&tv, 0);
+  return (double)tv.tv_sec * 1000.0 + (double)tv.tv_usec / 1000.0;
+}
+
+static int gStepTimingDepth = 0;
+static double gStepApiMs = 0.0;
+static double gStepCoreMs = 0.0;
+static double gStepMutexEnterMs = 0.0;
+static double gStepMutexLeaveMs = 0.0;
+static double gStepAutoResetMs = 0.0;
+static double gStepReadyMs = 0.0;
+static double gStepListMs = 0.0;
+static double gStepExecMs = 0.0;
+static double gStepProfileMs = 0.0;
+static double gStepTransferMs = 0.0;
+static double gStepApiExitMs = 0.0;
+static double gStepReprepareMs = 0.0;
+static double gStepResetMs = 0.0;
+static int gStepTopCount = 0;
+
+void sqlite4_step_timing_report(void){
+  double known = gStepCoreMs + gStepMutexEnterMs + gStepMutexLeaveMs
+               + gStepReprepareMs + gStepResetMs;
+  double other = gStepApiMs - known;
+  if( other<0.0 ) other = 0.0;
+  fprintf(stderr, "step top-level calls: %d\n", gStepTopCount);
+  fprintf(stderr, "step api total: %.1f ms\n", gStepApiMs);
+  fprintf(stderr, "step core total: %.1f ms\n", gStepCoreMs);
+  fprintf(stderr, "step mutex enter: %.1f ms\n", gStepMutexEnterMs);
+  fprintf(stderr, "step mutex leave: %.1f ms\n", gStepMutexLeaveMs);
+  fprintf(stderr, "step auto reset: %.1f ms\n", gStepAutoResetMs);
+  fprintf(stderr, "step ready setup: %.1f ms\n", gStepReadyMs);
+  fprintf(stderr, "step vdbe list: %.1f ms\n", gStepListMs);
+  fprintf(stderr, "step vdbe exec: %.1f ms\n", gStepExecMs);
+  fprintf(stderr, "step profile: %.1f ms\n", gStepProfileMs);
+  fprintf(stderr, "step wal callback: 0.0 ms\n");
+  fprintf(stderr, "step transfer error: %.1f ms\n", gStepTransferMs);
+  fprintf(stderr, "step api exit: %.1f ms\n", gStepApiExitMs);
+  fprintf(stderr, "step reprepare: %.1f ms\n", gStepReprepareMs);
+  fprintf(stderr, "step reset: %.1f ms\n", gStepResetMs);
+  fprintf(stderr, "step wrapper other: %.1f ms\n", other);
+}
 
 /*
 ** Check on a Vdbe to make sure it has not been finalized.  Log
@@ -323,6 +369,9 @@ void sqlite4_result_error_nomem(sqlite4_context *pCtx){
 static int sqlite4Step(Vdbe *p){
   sqlite4 *db;
   int rc;
+  int isTopLevel = (gStepTimingDepth==1);
+  double stepCoreStartMs = isTopLevel ? sqlite4StepTimingNowMs() : 0.0;
+  double t0;
 
   assert(p);
   if( p->magic!=VDBE_MAGIC_RUN ){
@@ -344,12 +393,16 @@ static int sqlite4Step(Vdbe *p){
     */
 #ifdef SQLITE4_OMIT_AUTORESET
     if( p->rc==SQLITE4_BUSY || p->rc==SQLITE4_LOCKED ){
+      t0 = isTopLevel ? sqlite4StepTimingNowMs() : 0.0;
       sqlite4_reset((sqlite4_stmt*)p);
+      if( isTopLevel ) gStepAutoResetMs += sqlite4StepTimingNowMs() - t0;
     }else{
       return SQLITE4_MISUSE_BKPT;
     }
 #else
+    t0 = isTopLevel ? sqlite4StepTimingNowMs() : 0.0;
     sqlite4_reset((sqlite4_stmt*)p);
+    if( isTopLevel ) gStepAutoResetMs += sqlite4StepTimingNowMs() - t0;
 #endif
   }
 
@@ -366,6 +419,7 @@ static int sqlite4Step(Vdbe *p){
     goto end_of_step;
   }
   if( p->pc<0 ){
+    t0 = isTopLevel ? sqlite4StepTimingNowMs() : 0.0;
     /* If there are no other statements currently running, then
     ** reset the interrupt flag.  This prevents a call to sqlite4_interrupt
     ** from interrupting a statement that has not yet started.
@@ -385,32 +439,41 @@ static int sqlite4Step(Vdbe *p){
     db->activeVdbeCnt++;
     if( p->readOnly==0 ) db->writeVdbeCnt++;
     p->pc = 0;
+    if( isTopLevel ) gStepReadyMs += sqlite4StepTimingNowMs() - t0;
   }
 #ifndef SQLITE4_OMIT_EXPLAIN
   if( p->explain ){
+    t0 = isTopLevel ? sqlite4StepTimingNowMs() : 0.0;
     rc = sqlite4VdbeList(p);
+    if( isTopLevel ) gStepListMs += sqlite4StepTimingNowMs() - t0;
   }else
 #endif /* SQLITE4_OMIT_EXPLAIN */
   {
+    t0 = isTopLevel ? sqlite4StepTimingNowMs() : 0.0;
     db->vdbeExecCnt++;
     rc = sqlite4VdbeExec(p);
     db->vdbeExecCnt--;
+    if( isTopLevel ) gStepExecMs += sqlite4StepTimingNowMs() - t0;
   }
 
 #ifndef SQLITE4_OMIT_TRACE
   /* Invoke the profile callback if there is one
   */
+  t0 = isTopLevel ? sqlite4StepTimingNowMs() : 0.0;
   if( rc!=SQLITE4_ROW && db->xProfile && !db->init.busy && p->zSql ){
     sqlite4_uint64 iNow = 0;
     sqlite4OsCurrentTime(0, &iNow);
     db->xProfile(db->pProfileArg, p->zSql, (iNow - p->startTime)*1000000);
   }
+  if( isTopLevel ) gStepProfileMs += sqlite4StepTimingNowMs() - t0;
 #endif
 
   db->errCode = rc;
+  t0 = isTopLevel ? sqlite4StepTimingNowMs() : 0.0;
   if( SQLITE4_NOMEM==sqlite4ApiExit(p->db, p->rc) ){
     p->rc = SQLITE4_NOMEM;
   }
+  if( isTopLevel ) gStepApiExitMs += sqlite4StepTimingNowMs() - t0;
 end_of_step:
   /* At this point local variable rc holds the value that should be 
   ** returned if this statement was compiled using the legacy 
@@ -424,8 +487,11 @@ end_of_step:
   );
   assert( p->rc!=SQLITE4_ROW && p->rc!=SQLITE4_DONE );
   if( rc!=SQLITE4_ROW && rc!=SQLITE4_DONE ){
+    t0 = isTopLevel ? sqlite4StepTimingNowMs() : 0.0;
     rc = sqlite4VdbeTransferError(p);
+    if( isTopLevel ) gStepTransferMs += sqlite4StepTimingNowMs() - t0;
   }
+  if( isTopLevel ) gStepCoreMs += sqlite4StepTimingNowMs() - stepCoreStartMs;
   return rc;
 }
 
@@ -448,16 +514,30 @@ int sqlite4_step(sqlite4_stmt *pStmt){
   Vdbe *v = (Vdbe*)pStmt;  /* the prepared statement */
   int cnt = 0;             /* Counter to prevent infinite loop of reprepares */
   sqlite4 *db;             /* The database connection */
+  int isTopLevel = (gStepTimingDepth==0);
+  double apiStartMs = isTopLevel ? sqlite4StepTimingNowMs() : 0.0;
+  double t0;
 
   if( vdbeSafetyNotNull(v) ){
     return SQLITE4_MISUSE_BKPT;
   }
   db = v->db;
+  t0 = isTopLevel ? sqlite4StepTimingNowMs() : 0.0;
   sqlite4_mutex_enter(db->mutex);
+  if( isTopLevel ){
+    gStepMutexEnterMs += sqlite4StepTimingNowMs() - t0;
+    gStepTopCount++;
+  }
+  gStepTimingDepth++;
   while( (rc = sqlite4Step(v))==SQLITE4_SCHEMA
-         && cnt++ < SQLITE4_MAX_SCHEMA_RETRY
-         && (rc2 = rc = sqlite4Reprepare(v))==SQLITE4_OK ){
+         && cnt++ < SQLITE4_MAX_SCHEMA_RETRY ){
+    t0 = isTopLevel ? sqlite4StepTimingNowMs() : 0.0;
+    rc2 = rc = sqlite4Reprepare(v);
+    if( isTopLevel ) gStepReprepareMs += sqlite4StepTimingNowMs() - t0;
+    if( rc2!=SQLITE4_OK ) break;
+    t0 = isTopLevel ? sqlite4StepTimingNowMs() : 0.0;
     sqlite4_reset(pStmt);
+    if( isTopLevel ) gStepResetMs += sqlite4StepTimingNowMs() - t0;
     assert( v->expired==0 );
   }
   if( rc2!=SQLITE4_OK && ALWAYS(db->pErr) ){
@@ -479,8 +559,16 @@ int sqlite4_step(sqlite4_stmt *pStmt){
       v->rc = rc = SQLITE4_NOMEM;
     }
   }
+  gStepTimingDepth--;
+  t0 = isTopLevel ? sqlite4StepTimingNowMs() : 0.0;
   rc = sqlite4ApiExit(db, rc);
+  if( isTopLevel ) gStepApiExitMs += sqlite4StepTimingNowMs() - t0;
+  t0 = isTopLevel ? sqlite4StepTimingNowMs() : 0.0;
   sqlite4_mutex_leave(db->mutex);
+  if( isTopLevel ){
+    gStepMutexLeaveMs += sqlite4StepTimingNowMs() - t0;
+    gStepApiMs += sqlite4StepTimingNowMs() - apiStartMs;
+  }
   return rc;
 }
 

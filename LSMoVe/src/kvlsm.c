@@ -16,6 +16,7 @@
 #include "sqliteInt.h"
 #include "lsm.h"
 #include <lz4.h>
+#include <time.h>
 #include <zlib.h>
 
 /* Forward declarations of objects */
@@ -47,6 +48,19 @@ struct KVLsmCsr {
 #define KVLSM_COMPRESSION_ZLIB_ID 100
 #define KVLSM_COMPRESSION_LZ4_ID 101
 
+double g_lsmCompressMs = 0.0;
+double g_lsmUncompressMs = 0.0;
+int g_lsmCompressCalls = 0;
+int g_lsmUncompressCalls = 0;
+long long g_lsmCompressInBytes = 0;
+long long g_lsmCompressOutBytes = 0;
+long long g_lsmUncompressInBytes = 0;
+long long g_lsmUncompressOutBytes = 0;
+
+static double kvlsmMsBetween(struct timespec *p0, struct timespec *p1){
+  return (p1->tv_sec - p0->tv_sec)*1000.0 + (p1->tv_nsec - p0->tv_nsec)/1e6;
+}
+
 static int kvlsmZlibBound(void *pCtx, int nSrc){
   UNUSED_PARAMETER(pCtx);
   return (int)compressBound((uLong)nSrc);
@@ -59,9 +73,16 @@ static int kvlsmZlibCompress(
 ){
   uLongf nOut = (uLongf)*pnOut;
   int rc;
+  struct timespec t0, t1;
   UNUSED_PARAMETER(pCtx);
 
+  clock_gettime(CLOCK_MONOTONIC, &t0);
   rc = compress((Bytef*)aOut, &nOut, (const Bytef*)aIn, (uLong)nIn);
+  clock_gettime(CLOCK_MONOTONIC, &t1);
+  g_lsmCompressMs += kvlsmMsBetween(&t0, &t1);
+  g_lsmCompressCalls++;
+  g_lsmCompressInBytes += nIn;
+  g_lsmCompressOutBytes += (rc==Z_OK) ? (long long)nOut : 0;
   if( rc!=Z_OK ){
     return LSM_ERROR;
   }
@@ -77,9 +98,16 @@ static int kvlsmZlibUncompress(
 ){
   uLongf nOut = (uLongf)*pnOut;
   int rc;
+  struct timespec t0, t1;
   UNUSED_PARAMETER(pCtx);
 
+  clock_gettime(CLOCK_MONOTONIC, &t0);
   rc = uncompress((Bytef*)aOut, &nOut, (const Bytef*)aIn, (uLong)nIn);
+  clock_gettime(CLOCK_MONOTONIC, &t1);
+  g_lsmUncompressMs += kvlsmMsBetween(&t0, &t1);
+  g_lsmUncompressCalls++;
+  g_lsmUncompressInBytes += nIn;
+  g_lsmUncompressOutBytes += (rc==Z_OK) ? (long long)nOut : 0;
   if( rc!=Z_OK ){
     return LSM_ERROR;
   }
@@ -108,9 +136,16 @@ static int kvlsmLz4Compress(
   const char *aIn, int nIn
 ){
   int nOut;
+  struct timespec t0, t1;
   UNUSED_PARAMETER(pCtx);
 
+  clock_gettime(CLOCK_MONOTONIC, &t0);
   nOut = LZ4_compress_default(aIn, aOut, nIn, *pnOut);
+  clock_gettime(CLOCK_MONOTONIC, &t1);
+  g_lsmCompressMs += kvlsmMsBetween(&t0, &t1);
+  g_lsmCompressCalls++;
+  g_lsmCompressInBytes += nIn;
+  g_lsmCompressOutBytes += nOut>0 ? nOut : 0;
   if( nOut<=0 ){
     return LSM_ERROR;
   }
@@ -125,9 +160,16 @@ static int kvlsmLz4Uncompress(
   const char *aIn, int nIn
 ){
   int nOut;
+  struct timespec t0, t1;
   UNUSED_PARAMETER(pCtx);
 
+  clock_gettime(CLOCK_MONOTONIC, &t0);
   nOut = LZ4_decompress_safe(aIn, aOut, nIn, *pnOut);
+  clock_gettime(CLOCK_MONOTONIC, &t1);
+  g_lsmUncompressMs += kvlsmMsBetween(&t0, &t1);
+  g_lsmUncompressCalls++;
+  g_lsmUncompressInBytes += nIn;
+  g_lsmUncompressOutBytes += nOut>=0 ? nOut : 0;
   if( nOut<0 ){
     return LSM_ERROR;
   }

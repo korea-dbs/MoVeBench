@@ -15,7 +15,33 @@
 ** accessed by users of the library.
 */
 
+#include <sys/time.h>
 #include "sqliteInt.h"
+
+static double shell_exec_now_ms(void){
+  struct timeval tv;
+  gettimeofday(&tv, 0);
+  return (double)tv.tv_sec * 1000.0 + (double)tv.tv_usec / 1000.0;
+}
+
+static double gShellExecMs = 0.0;
+static double gShellPrepareMs = 0.0;
+static double gShellStepMs = 0.0;
+static double gShellFinalizeMs = 0.0;
+static int gShellStmtCount = 0;
+
+extern void sqlite4_step_timing_report(void);
+
+void sqlite4_shell_timing_report(void){
+  double shellOtherMs = gShellExecMs - gShellPrepareMs - gShellStepMs - gShellFinalizeMs;
+  if( shellOtherMs<0.0 ) shellOtherMs = 0.0;
+  fprintf(stderr, "shell statements: %d\n", gShellStmtCount);
+  fprintf(stderr, "shell prepare: %.1f ms\n", gShellPrepareMs);
+  fprintf(stderr, "shell step: %.1f ms\n", gShellStepMs);
+  fprintf(stderr, "shell finalize: %.1f ms\n", gShellFinalizeMs);
+  fprintf(stderr, "shell other: %.1f ms\n", shellOtherMs);
+  sqlite4_step_timing_report();
+}
 
 /*
 ** Execute SQL code.  Return one of the SQLITE4_ success/failure
@@ -36,6 +62,7 @@ int sqlite4_exec(
   int rc = SQLITE4_OK;        /* Return code */
   int nRetry = 0;             /* Number of retry attempts */
   int bAbort = 0;             /* Set to true if callback returns non-zero */
+  double shellExecStartMs = shell_exec_now_ms();
 
   if( !sqlite4SafetyCheckOk(db) ) return SQLITE4_MISUSE_BKPT;
   if( zSql==0 ) zSql = "";
@@ -53,9 +80,12 @@ int sqlite4_exec(
     sqlite4_stmt *pStmt = 0;      /* The current SQL statement */
     const char **azCol = 0;       /* Names of result columns */
     sqlite4_value **apVal = 0;    /* Row of value objects */
+    double t0;
 
     pStmt = 0;
+    t0 = shell_exec_now_ms();
     rc = sqlite4_prepare(db, zSql, -1, &pStmt, &nUsed);
+    gShellPrepareMs += shell_exec_now_ms() - t0;
     assert( rc==SQLITE4_OK || pStmt==0 );
     if( rc!=SQLITE4_OK ){
       continue;
@@ -65,12 +95,15 @@ int sqlite4_exec(
       zSql += nUsed;
       continue;
     }
+    gShellStmtCount++;
 
     nCol = sqlite4_column_count(pStmt);
     do {
 
       /* Step the statement. Then invoke the callback function if required */
+      t0 = shell_exec_now_ms();
       rc = sqlite4_step(pStmt);
+      gShellStepMs += shell_exec_now_ms() - t0;
       if( xCall && SQLITE4_ROW==rc ){
         if( azCol==0 ){
           int nAlloc;             /* Bytes of space to allocate */
@@ -100,7 +133,9 @@ int sqlite4_exec(
       }
 
       if( bAbort || rc!=SQLITE4_ROW ){
+        t0 = shell_exec_now_ms();
         rc = sqlite4VdbeFinalize((Vdbe *)pStmt);
+        gShellFinalizeMs += shell_exec_now_ms() - t0;
         pStmt = 0;
         if( rc!=SQLITE4_SCHEMA ){
           nRetry = 0;
@@ -118,5 +153,6 @@ int sqlite4_exec(
   rc = sqlite4ApiExit(db, rc);
 
   sqlite4_mutex_leave(db->mutex);
+  gShellExecMs += shell_exec_now_ms() - shellExecStartMs;
   return rc;
 }

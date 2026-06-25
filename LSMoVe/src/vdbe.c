@@ -45,9 +45,16 @@
 */
 #include "sqliteInt.h"
 #include "vdbeInt.h"
+#include <sys/time.h>
 
 #ifndef SQLITE4_OMIT_VECTOR
 #include "vectorIndexInt.h"
+
+static double diskAnnVdbeNowMs(void){
+  struct timeval tv;
+  gettimeofday(&tv, 0);
+  return (double)tv.tv_sec*1000.0 + (double)tv.tv_usec/1000.0;
+}
 #endif
 
 /*
@@ -569,6 +576,14 @@ int sqlite4VdbeExec(
   u64 start;                 /* CPU clock count at start of opcode */
   int origPc;                /* Program counter at start of opcode */
 #endif
+#ifndef SQLITE4_OMIT_VECTOR
+  int isInsertStmt = 0;
+  double insertStmtStartMs = 0;
+  double insertOtherMs = 0;
+  double insertFinishMs = 0;
+  double insertOpStartMs = 0;
+  int isVectorInsertOp = 0;
+#endif
   /*** INSERT STACK UNION HERE ***/
 
   assert( p->magic==VDBE_MAGIC_RUN );  /* sqlite4_step() verifies this */
@@ -581,6 +596,23 @@ int sqlite4VdbeExec(
   p->rc = SQLITE4_OK;
   assert( p->explain==0 );
   p->pResultSet = 0;
+#ifndef SQLITE4_OMIT_VECTOR
+  if( p->zSql ){
+    const char *z = p->zSql;
+    int ii;
+    while( sqlite4Isspace(*z) ) z++;
+    if( sqlite4_strnicmp(z, "insert", 6)==0 ){
+      isInsertStmt = 1;
+      for(ii=0; z[ii]; ii++){
+        if( sqlite4_strnicmp(&z[ii], "_shadow", 7)==0 ){
+          isInsertStmt = 0;
+          break;
+        }
+      }
+      if( isInsertStmt ) insertStmtStartMs = diskAnnVdbeNowMs();
+    }
+  }
+#endif
   CHECK_FOR_INTERRUPT;
   sqlite4VdbeIOTraceSql(p);
 #ifndef SQLITE4_OMIT_PROGRESS_CALLBACK
@@ -606,6 +638,17 @@ int sqlite4VdbeExec(
     start = sqlite4Hwtime();
 #endif
     pOp = &aOp[pc];
+#ifndef SQLITE4_OMIT_VECTOR
+    if( isInsertStmt ){
+      VdbeCursor *pOpCsr = 0;
+      insertOpStartMs = diskAnnVdbeNowMs();
+      isVectorInsertOp = 0;
+      if( pOp->opcode==OP_Insert && pOp->p1>=0 && pOp->p1<p->nCursor ){
+        pOpCsr = p->apCsr[pOp->p1];
+        isVectorInsertOp = pOpCsr && isVectorCursor(pOpCsr);
+      }
+    }
+#endif
 
     /* Only allow tracing if SQLITE4_DEBUG is defined.
     */
@@ -860,6 +903,13 @@ case OP_Halt: {
     sqlite4_log(db->pEnv, pOp->p1,
                 "constraint failed at %d in [%s]", pc, p->zSql);
   }
+#ifndef SQLITE4_OMIT_VECTOR
+  if( isInsertStmt ){
+    double finishStartMs = diskAnnVdbeNowMs();
+    rc = sqlite4VdbeHalt(p);
+    insertFinishMs += diskAnnVdbeNowMs() - finishStartMs;
+  }else
+#endif
   rc = sqlite4VdbeHalt(p);
   assert( rc==SQLITE4_BUSY || rc==SQLITE4_OK || rc==SQLITE4_ERROR );
   if( rc==SQLITE4_BUSY ){
@@ -3779,7 +3829,6 @@ case OP_Insert: {
   KVByteArray *pKVKey;
   KVByteArray aKey[24];
 
-
   pC = p->apCsr[pOp->p1];
   pKey = &aMem[pOp->p3];
   pData = pOp->p2 ? &aMem[pOp->p2] : 0;
@@ -3788,6 +3837,8 @@ case OP_Insert: {
 
 #ifndef SQLITE4_OMIT_VECTOR
   if( isVectorCursor(pC) ){
+    double vectorCallStartMs;
+    double vectorCallEndMs;
     /* For vector index cursors, extract the rowid and vector from the key,
     ** and call vectorIndexInsert. The key Mem contains the index key blob
     ** with the rowid encoded at the end. For now, we extract rowid from P3
@@ -3797,10 +3848,14 @@ case OP_Insert: {
       rowid = sqlite4VdbeIntValue(pKey);
     }
     /* pData holds the vector value for index insert */
+    vectorCallStartMs = diskAnnVdbeNowMs();
+    if( isInsertStmt ) insertOtherMs += vectorCallStartMs - insertOpStartMs;
     rc = vectorIndexInsert(pC->pVecIdx, rowid, (sqlite4_value*)pData, &p->zErrMsg);
+    vectorCallEndMs = diskAnnVdbeNowMs();
     if( rc ) goto abort_due_to_error;
     if( pOp->p5 & OPFLAG_NCHANGE ) p->nChange++;
     pC->rowChnged = 1;
+    if( isInsertStmt ) insertOtherMs += diskAnnVdbeNowMs() - vectorCallEndMs;
     break;
   }
 #endif
@@ -3818,7 +3873,6 @@ case OP_Insert: {
     nKVKey = pKey->n;
     pKVKey = pKey->z;
   }
-
 
   rc = sqlite4KVStoreReplace(
      pC->pKVCur->pStore,
@@ -5098,6 +5152,12 @@ default: {          /* This is really OP_Noop and OP_Explain */
 *****************************************************************************/
     }
 
+#ifndef SQLITE4_OMIT_VECTOR
+    if( isInsertStmt && !isVectorInsertOp ){
+      insertOtherMs += diskAnnVdbeNowMs() - insertOpStartMs;
+    }
+#endif
+
 #ifdef VDBE_PROFILE
     {
       u64 elapsed = sqlite4Hwtime() - start;
@@ -5141,6 +5201,13 @@ vdbe_error_halt:
   testcase( sqlite4DefaultEnv.xLog!=0 );
   sqlite4_log(db->pEnv, rc, "statement aborts at %d: [%s] %s", 
                    pc, p->zSql, p->zErrMsg);
+#ifndef SQLITE4_OMIT_VECTOR
+  if( isInsertStmt ){
+    double finishStartMs = diskAnnVdbeNowMs();
+    sqlite4VdbeHalt(p);
+    insertFinishMs += diskAnnVdbeNowMs() - finishStartMs;
+  }else
+#endif
   sqlite4VdbeHalt(p);
   if( rc==SQLITE4_IOERR_NOMEM ) db->mallocFailed = 1;
   rc = SQLITE4_ERROR;
@@ -5152,6 +5219,13 @@ vdbe_error_halt:
   ** release the mutexes on btrees that were acquired at the
   ** top. */
 vdbe_return:
+#ifndef SQLITE4_OMIT_VECTOR
+  if( isInsertStmt ){
+    diskAnnRecordInsertStmt(diskAnnVdbeNowMs() - insertStmtStartMs);
+    diskAnnRecordInsertOther(insertOtherMs);
+    diskAnnRecordInsertFinish(insertFinishMs);
+  }
+#endif
   return rc;
 
   /* Jump to here if a string or blob larger than SQLITE4_MAX_LENGTH

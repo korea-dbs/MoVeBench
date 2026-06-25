@@ -20,11 +20,18 @@
 */
 #include "sqliteInt.h"
 #include "vdbeInt.h"
+#include <sys/time.h>
 #ifdef LIBSQL_ENABLE_WASM_RUNTIME
 #include "ext/udf/wasm_bindings.h"
 #endif
 #ifndef SQLITE_OMIT_VECTOR
 #include "vectorIndexInt.h"
+
+static double diskAnnVdbeNowMs(void){
+  struct timeval tv;
+  gettimeofday(&tv, 0);
+  return (double)tv.tv_sec*1000.0 + (double)tv.tv_usec/1000.0;
+}
 #endif
 
 /*
@@ -859,6 +866,14 @@ int sqlite3VdbeExec(
   u64 *pnCycle = 0;
   int bStmtScanStatus = IS_STMT_SCANSTATUS(db)!=0;
 #endif
+#ifndef SQLITE_OMIT_VECTOR
+  int isInsertStmt = 0;
+  double insertStmtStartMs = 0;
+  double insertOtherMs = 0;
+  double insertFinishMs = 0;
+  double insertOpStartMs = 0;
+  int isVectorInsertOp = 0;
+#endif
   /*** INSERT STACK UNION HERE ***/
 
   assert( p->eVdbeState==VDBE_RUN_STATE );  /* sqlite3_step() verifies this */
@@ -888,6 +903,23 @@ int sqlite3VdbeExec(
   db->busyHandler.nBusy = 0;
   if( AtomicLoad(&db->u1.isInterrupted) ) goto abort_due_to_interrupt;
   sqlite3VdbeIOTraceSql(p);
+#ifndef SQLITE_OMIT_VECTOR
+  if( p->zSql ){
+    const char *z = p->zSql;
+    int ii;
+    while( sqlite3Isspace(*z) ) z++;
+    if( sqlite3_strnicmp(z, "insert", 6)==0 ){
+      isInsertStmt = 1;
+      for(ii=0; z[ii]; ii++){
+        if( sqlite3_strnicmp(&z[ii], "_shadow", 7)==0 ){
+          isInsertStmt = 0;
+          break;
+        }
+      }
+      if( isInsertStmt ) insertStmtStartMs = diskAnnVdbeNowMs();
+    }
+  }
+#endif
 #ifdef SQLITE_DEBUG
   sqlite3BeginBenignMalloc();
   if( p->pc==0
@@ -922,6 +954,17 @@ int sqlite3VdbeExec(
 
     assert( pOp>=aOp && pOp<&aOp[p->nOp]);
     nVmStep++;
+#ifndef SQLITE_OMIT_VECTOR
+    if( isInsertStmt ){
+      VdbeCursor *pOpCsr = 0;
+      insertOpStartMs = diskAnnVdbeNowMs();
+      isVectorInsertOp = 0;
+      if( pOp->opcode==OP_IdxInsert && pOp->p1>=0 && pOp->p1<p->nCursor ){
+        pOpCsr = p->apCsr[pOp->p1];
+        isVectorInsertOp = pOpCsr && isVectorCursor(pOpCsr);
+      }
+    }
+#endif
 
 #if defined(VDBE_PROFILE)
     pOp->nExec++;
@@ -1325,6 +1368,13 @@ case OP_Halt: {
     pcx = (int)(pOp - aOp);
     sqlite3_log(pOp->p1, "abort at %d in [%s]: %s", pcx, p->zSql, p->zErrMsg);
   }
+#ifndef SQLITE_OMIT_VECTOR
+  if( isInsertStmt ){
+    double finishStartMs = diskAnnVdbeNowMs();
+    rc = sqlite3VdbeHalt(p);
+    insertFinishMs += diskAnnVdbeNowMs() - finishStartMs;
+  }else
+#endif
   rc = sqlite3VdbeHalt(p);
   assert( rc==SQLITE_BUSY || rc==SQLITE_OK || rc==SQLITE_ERROR );
   if( rc==SQLITE_BUSY ){
@@ -5770,7 +5820,6 @@ case OP_Insert: {
   const char *zDb;  /* database name - used by the update hook */
   Table *pTab;      /* Table structure - used by update and pre-update hooks */
   BtreePayload x;   /* Payload to be inserted */
-
   pData = &aMem[pOp->p2];
   assert( pOp->p1>=0 && pOp->p1<p->nCursor );
   assert( memIsValid(pData) );
@@ -6571,6 +6620,8 @@ case OP_IdxInsert: {        /* in2 */
   if( isVectorCursor(pC) ) {
     UnpackedRecord idxKeyStatic;
     UnpackedRecord *pIdxKey = NULL;
+    double vectorCallStartMs;
+    double vectorCallEndMs;
     int i;
     rc = ExpandBlob(pIn2);
     if( rc ) goto abort_due_to_error;
@@ -6588,7 +6639,10 @@ case OP_IdxInsert: {        /* in2 */
       pIdxKey = sqlite3VdbeAllocUnpackedRecord(pC->pKeyInfo);
       if( pIdxKey==0 ) goto no_mem;
       sqlite3VdbeRecordUnpack(pC->pKeyInfo, x.nKey, x.pKey, pIdxKey);
+      vectorCallStartMs = diskAnnVdbeNowMs();
+      if( isInsertStmt ) insertOtherMs += vectorCallStartMs - insertOpStartMs;
       rc = vectorIndexInsert(pC->uc.pVecIdx, pIdxKey, &p->zErrMsg);
+      vectorCallEndMs = diskAnnVdbeNowMs();
       /* 
        * vectorIndexInsert can allocate additional memory for sqlite3_value (usually during sqlite3_value_text/sqlite3_value_blob calls)
        * so, we need to explicitly clear it before freeing whole UnpackedRecord with single free(...) call
@@ -6597,10 +6651,15 @@ case OP_IdxInsert: {        /* in2 */
         sqlite3VdbeMemRelease(pIdxKey->aMem + i);
       }
       sqlite3DbFreeNN(db, pIdxKey);
+      if( isInsertStmt ) insertOtherMs += diskAnnVdbeNowMs() - vectorCallEndMs;
     }else {
       idxKeyStatic.nField = x.nMem;
       idxKeyStatic.aMem = x.aMem;
+      vectorCallStartMs = diskAnnVdbeNowMs();
+      if( isInsertStmt ) insertOtherMs += vectorCallStartMs - insertOpStartMs;
       rc = vectorIndexInsert(pC->uc.pVecIdx, &idxKeyStatic, &p->zErrMsg);
+      vectorCallEndMs = diskAnnVdbeNowMs();
+      if( isInsertStmt ) insertOtherMs += diskAnnVdbeNowMs() - vectorCallEndMs;
     }
     if( rc ) goto abort_due_to_error;
     break;
@@ -9209,6 +9268,12 @@ default: {          /* This is really OP_Noop, OP_Explain */
 *****************************************************************************/
     }
 
+#ifndef SQLITE_OMIT_VECTOR
+    if( isInsertStmt && !isVectorInsertOp ){
+      insertOtherMs += diskAnnVdbeNowMs() - insertOpStartMs;
+    }
+#endif
+
 #if defined(VDBE_PROFILE)
     *pnCycle += sqlite3NProfileCnt ? sqlite3NProfileCnt : sqlite3Hwtime();
     pnCycle = 0;
@@ -9278,7 +9343,16 @@ abort_due_to_error:
   testcase( sqlite3GlobalConfig.xLog!=0 );
   sqlite3_log(rc, "statement aborts at %d: [%s] %s",
                    (int)(pOp - aOp), p->zSql, p->zErrMsg);
-  if( p->eVdbeState==VDBE_RUN_STATE ) sqlite3VdbeHalt(p);
+  if( p->eVdbeState==VDBE_RUN_STATE ){
+#ifndef SQLITE_OMIT_VECTOR
+    if( isInsertStmt ){
+      double finishStartMs = diskAnnVdbeNowMs();
+      sqlite3VdbeHalt(p);
+      insertFinishMs += diskAnnVdbeNowMs() - finishStartMs;
+    }else
+#endif
+    sqlite3VdbeHalt(p);
+  }
   if( rc==SQLITE_IOERR_NOMEM ) sqlite3OomFault(db);
   if( rc==SQLITE_CORRUPT && db->autoCommit==0 ){
     db->flags |= SQLITE_CorruptRdOnly;
@@ -9318,6 +9392,13 @@ vdbe_return:
   if( DbMaskNonZero(p->lockMask) ){
     sqlite3VdbeLeave(p);
   }
+#ifndef SQLITE_OMIT_VECTOR
+  if( isInsertStmt ){
+    diskAnnRecordInsertStmt(diskAnnVdbeNowMs() - insertStmtStartMs);
+    diskAnnRecordInsertOther(insertOtherMs);
+    diskAnnRecordInsertFinish(insertFinishMs);
+  }
+#endif
   assert( rc!=SQLITE_OK || nExtraDelete==0
        || sqlite3_strlike("DELETE%",p->zSql,0)!=0
   );

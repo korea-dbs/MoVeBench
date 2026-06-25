@@ -59,6 +59,14 @@
 /* Per-operation I/O timing (accumulated in blobSpot functions) */
 static double g_totalBlobReadMs;
 static double g_totalBlobWriteMs;
+static double g_totalBlobOpenMs;
+static double g_totalBlobReopenMs;
+static double g_totalBlobReadCallMs;
+static int g_totalBlobCacheHits;
+static int g_totalBlobCacheMisses;
+static double g_totalInsertStmtMs;
+static double g_totalInsertOtherMs;
+static double g_totalInsertFinishMs;
 static int g_searchVisitedTotal;
 static long long g_searchEdgesTotal;
 
@@ -68,7 +76,10 @@ static double g_totalShadowInsMs;
 static double g_totalPass1Ms;
 static double g_totalPass2Ms;
 static double g_totalFlushMs;
+static double g_totalIndexBuildMs;
 static int g_totalInsertCount;
+static int g_totalInsertStmtCount;
+static int g_totalIndexBuildCount;
 static int g_atexitRegistered;
 
 /* Search-specific stats */
@@ -76,17 +87,34 @@ static int g_queryCount;
 static double g_queryTotalMs;
 static double g_queryGraphMs;
 static double g_queryResultMs;
+static double g_queryStartNodeMs;
+static double g_queryCtxInitMs;
+static double g_queryCtxDeinitMs;
 static double g_queryBlobReadMs;
+static double g_queryBlobOpenMs;
+static double g_queryBlobReopenMs;
+static double g_queryBlobReadCallMs;
+static int g_queryBlobCacheHits;
+static int g_queryBlobCacheMisses;
 static int g_queryBlobReads;
 static int g_queryNodesVisited;
 static long long g_queryEdgesExamined;
 static double g_queryDistanceMs;
+static double g_vectorSearchTotalMs;
+static double g_vectorSearchParseMs;
+static double g_vectorSearchLookupMs;
+static double g_vectorSearchDiskAnnMs;
+static double g_vectorSearchCloseMs;
 static double g_buildDistanceMs;
 static double g_totalBuildReadMs;
 static double g_totalBuildWriteMs;
 static double g_totalBuildDistMs;
 static int g_distTimingMode = 0; /* 0=off, 1=query, 2=build */
 static int g_ioTimingEnabled = -1;
+
+static double diskAnnMsBetween(struct timespec *p0, struct timespec *p1){
+  return (p1->tv_sec - p0->tv_sec)*1000.0 + (p1->tv_nsec - p0->tv_nsec)/1e6;
+}
 
 static int diskAnnIoTimingEnabled(void){
   if( g_ioTimingEnabled < 0 ){
@@ -268,7 +296,10 @@ out:
 
 int blobSpotReload(DiskAnnIndex *pIndex, BlobSpot *pBlobSpot, u64 nRowid, int nBufferSize) {
   int rc;
-  struct timespec _br0, _br1;
+  struct timespec _br0, _br1, _bo0, _bo1, _bro0, _bro1, _bc0, _bc1;
+  int doTiming = diskAnnIoTimingEnabled();
+  int hit0 = 0, hit1 = 0, hitHi = 0;
+  int miss0 = 0, miss1 = 0, missHi = 0;
 
   DiskAnnTrace(("blob spot reload: rowid=%lld\n", nRowid));
   assert( pBlobSpot != NULL && (pBlobSpot->pBlob != NULL || pBlobSpot->isAborted ) );
@@ -278,7 +309,11 @@ int blobSpotReload(DiskAnnIndex *pIndex, BlobSpot *pBlobSpot, u64 nRowid, int nB
     return SQLITE_OK;
   }
 
-  if( diskAnnIoTimingEnabled() ) clock_gettime(CLOCK_MONOTONIC, &_br0);
+  if( doTiming ){
+    clock_gettime(CLOCK_MONOTONIC, &_br0);
+    sqlite3_db_status(pIndex->db, SQLITE_DBSTATUS_CACHE_HIT, &hit0, &hitHi, 0);
+    sqlite3_db_status(pIndex->db, SQLITE_DBSTATUS_CACHE_MISS, &miss0, &missHi, 0);
+  }
 
   // if last blob open/reopen operation aborted - we need to close current blob and open new one
   // (as all operations over aborted blob will return SQLITE_ABORT error)
@@ -291,7 +326,12 @@ int blobSpotReload(DiskAnnIndex *pIndex, BlobSpot *pBlobSpot, u64 nRowid, int nB
     pBlobSpot->isAborted = 0;
     pBlobSpot->nRowid = nRowid;
 
+    if( doTiming ) clock_gettime(CLOCK_MONOTONIC, &_bo0);
     rc = sqlite3_blob_open(pIndex->db, pIndex->zDbSName, pIndex->zShadow, "data", nRowid, pBlobSpot->isWritable, &pBlobSpot->pBlob);
+    if( doTiming ){
+      clock_gettime(CLOCK_MONOTONIC, &_bo1);
+      g_totalBlobOpenMs += diskAnnMsBetween(&_bo0, &_bo1);
+    }
     rc = blobSpotConvertRc(pIndex, rc);
     if( rc != SQLITE_OK ){
       goto abort;
@@ -299,7 +339,12 @@ int blobSpotReload(DiskAnnIndex *pIndex, BlobSpot *pBlobSpot, u64 nRowid, int nB
   }
 
   if( pBlobSpot->nRowid != nRowid ){
+    if( doTiming ) clock_gettime(CLOCK_MONOTONIC, &_bro0);
     rc = sqlite3_blob_reopen(pBlobSpot->pBlob, nRowid);
+    if( doTiming ){
+      clock_gettime(CLOCK_MONOTONIC, &_bro1);
+      g_totalBlobReopenMs += diskAnnMsBetween(&_bro0, &_bro1);
+    }
     rc = blobSpotConvertRc(pIndex, rc);
     if( rc != SQLITE_OK ){
       goto abort;
@@ -307,15 +352,23 @@ int blobSpotReload(DiskAnnIndex *pIndex, BlobSpot *pBlobSpot, u64 nRowid, int nB
     pBlobSpot->nRowid = nRowid;
     pBlobSpot->isInitialized = 0;
   }
+  if( doTiming ) clock_gettime(CLOCK_MONOTONIC, &_bc0);
   rc = sqlite3_blob_read(pBlobSpot->pBlob, pBlobSpot->pBuffer, nBufferSize, 0);
+  if( doTiming ){
+    clock_gettime(CLOCK_MONOTONIC, &_bc1);
+    g_totalBlobReadCallMs += diskAnnMsBetween(&_bc0, &_bc1);
+  }
   if( rc != SQLITE_OK ){
     goto abort;
   }
 
-  if( diskAnnIoTimingEnabled() ){
+  if( doTiming ){
     clock_gettime(CLOCK_MONOTONIC, &_br1);
-    g_totalBlobReadMs += (_br1.tv_sec - _br0.tv_sec)*1000.0
-                       + (_br1.tv_nsec - _br0.tv_nsec)/1e6;
+    sqlite3_db_status(pIndex->db, SQLITE_DBSTATUS_CACHE_HIT, &hit1, &hitHi, 0);
+    sqlite3_db_status(pIndex->db, SQLITE_DBSTATUS_CACHE_MISS, &miss1, &missHi, 0);
+    g_totalBlobReadMs += diskAnnMsBetween(&_br0, &_br1);
+    g_totalBlobCacheHits += hit1 - hit0;
+    g_totalBlobCacheMisses += miss1 - miss0;
   }
 
   pIndex->nReads++;
@@ -679,19 +732,19 @@ int diskAnnDropIndex(sqlite3 *db, const char *zDbSName, const char *zIdxName){
 }
 
 /*
- * Select random row from the shadow table and set its rowid to pRowid
- * returns SQLITE_DONE if no row found (this will be used to determine case when table is empty)
- * TODO: we need to make this selection procedure faster - now it works in linear time
+ * Select random row from the shadow table and set its rowid to pRowid.
 */
-static int diskAnnSelectRandomShadowRow(const DiskAnnIndex *pIndex, u64 *pRowid){
+static int diskAnnSelectRandomShadowRow(DiskAnnIndex *pIndex, u64 *pRowid){
   int rc;
   sqlite3_stmt *pStmt = NULL;
   char *zSql = NULL;
 
   zSql = sqlite3MPrintf(
     pIndex->db,
-    "SELECT rowid FROM \"%w\".%s LIMIT 1 OFFSET ABS(RANDOM()) %% MAX((SELECT COUNT(*) FROM \"%w\".%s), 1)",
-    pIndex->zDbSName, pIndex->zShadow, pIndex->zDbSName, pIndex->zShadow
+    "SELECT rowid FROM \"%w\".%s LIMIT 1 "
+    "OFFSET ABS(RANDOM()) %% MAX((SELECT COUNT(*) FROM \"%w\".%s), 1)",
+    pIndex->zDbSName, pIndex->zShadow,
+    pIndex->zDbSName, pIndex->zShadow
   );
   if( zSql == NULL ){
     rc = SQLITE_NOMEM_BKPT;
@@ -708,10 +761,9 @@ static int diskAnnSelectRandomShadowRow(const DiskAnnIndex *pIndex, u64 *pRowid)
 
   assert( sqlite3_column_type(pStmt, 0) == SQLITE_INTEGER );
   *pRowid = sqlite3_column_int64(pStmt, 0);
-
-  // check that we has only single row matching the criteria (otherwise - this is a bug)
   assert( sqlite3_step(pStmt) == SQLITE_DONE );
   rc = SQLITE_OK;
+
 out:
   if( pStmt != NULL ){
     sqlite3_finalize(pStmt);
@@ -838,7 +890,7 @@ out:
 /*
  * Insert new empty row to the shadow table and set new rowid to the pRowid (data will be zeroe-filled blob of size pIndex->nBlockSize)
 */
-static int diskAnnInsertShadowRow(const DiskAnnIndex *pIndex, const VectorInRow *pVectorInRow, u64 *pRowid){
+static int diskAnnInsertShadowRow(DiskAnnIndex *pIndex, const VectorInRow *pVectorInRow, u64 *pRowid){
   int rc, i;
   sqlite3_stmt *pStmt = NULL;
   char *zSql = NULL;
@@ -900,7 +952,7 @@ out:
 /*
  * Delete row from the shadow table
 */
-static int diskAnnDeleteShadowRow(const DiskAnnIndex *pIndex, i64 nRowid){
+static int diskAnnDeleteShadowRow(DiskAnnIndex *pIndex, i64 nRowid){
   int rc;
   sqlite3_stmt *pStmt = NULL;
   char *zSql = sqlite3MPrintf(
@@ -1513,8 +1565,13 @@ int diskAnnSearch(
   u64 nStartRowid;
   int nOutRows;
   int i;
-  struct timespec _q0, _q1, _qg0, _qg1, _qr0, _qr1;
+  struct timespec _q0, _q1, _qs0, _qs1, _qi0, _qi1, _qg0, _qg1, _qr0, _qr1, _qd0, _qd1;
   double blobReadBefore, blobReadAfter;
+  double blobOpenBefore, blobOpenAfter;
+  double blobReopenBefore, blobReopenAfter;
+  double blobReadCallBefore, blobReadCallAfter;
+  int blobCacheHitBefore, blobCacheHitAfter;
+  int blobCacheMissBefore, blobCacheMissAfter;
   int blobReadCountBefore, blobReadCountAfter;
   int visitedBefore, visitedAfter;
   long long edgesBefore, edgesAfter;
@@ -1538,11 +1595,19 @@ int diskAnnSearch(
 
   /* Snapshot counters before search */
   blobReadBefore = g_totalBlobReadMs;
+  blobOpenBefore = g_totalBlobOpenMs;
+  blobReopenBefore = g_totalBlobReopenMs;
+  blobReadCallBefore = g_totalBlobReadCallMs;
+  blobCacheHitBefore = g_totalBlobCacheHits;
+  blobCacheMissBefore = g_totalBlobCacheMisses;
   blobReadCountBefore = pIndex->nReads;
   visitedBefore = g_searchVisitedTotal;
   edgesBefore = g_searchEdgesTotal;
 
+  clock_gettime(CLOCK_MONOTONIC, &_qg0);
+  clock_gettime(CLOCK_MONOTONIC, &_qs0);
   rc = diskAnnSelectRandomShadowRow(pIndex, &nStartRowid);
+  clock_gettime(CLOCK_MONOTONIC, &_qs1);
   if( rc == SQLITE_DONE ){
     pRows->nRows = 0;
     pRows->nCols = pKey->nKeyColumns;
@@ -1551,14 +1616,15 @@ int diskAnnSearch(
     *pzErrMsg = sqlite3_mprintf("vector index(search): failed to select start node for search");
     return rc;
   }
+  clock_gettime(CLOCK_MONOTONIC, &_qi0);
   rc = diskAnnSearchCtxInit(pIndex, &ctx, pVector, pIndex->searchL, k, DISKANN_BLOB_READONLY);
+  clock_gettime(CLOCK_MONOTONIC, &_qi1);
   if( rc != SQLITE_OK ){
     *pzErrMsg = sqlite3_mprintf("vector index(search): failed to initialize search context");
     goto out;
   }
 
-  /* Graph traversal (timed) */
-  clock_gettime(CLOCK_MONOTONIC, &_qg0);
+  /* Graph traversal (timed, including start-node selection) */
   g_distTimingMode = 1;
   rc = diskAnnSearchInternal(pIndex, &ctx, nStartRowid, pzErrMsg);
   g_distTimingMode = 0;
@@ -1590,28 +1656,39 @@ int diskAnnSearch(
 
   /* Accumulate search stats */
   blobReadAfter = g_totalBlobReadMs;
+  blobOpenAfter = g_totalBlobOpenMs;
+  blobReopenAfter = g_totalBlobReopenMs;
+  blobReadCallAfter = g_totalBlobReadCallMs;
+  blobCacheHitAfter = g_totalBlobCacheHits;
+  blobCacheMissAfter = g_totalBlobCacheMisses;
   blobReadCountAfter = pIndex->nReads;
   visitedAfter = g_searchVisitedTotal;
   edgesAfter = g_searchEdgesTotal;
 
-  g_queryCount++;
-  {
-    double totalMs = (_qr1.tv_sec - _q0.tv_sec)*1000.0 + (_qr1.tv_nsec - _q0.tv_nsec)/1e6;
-    double graphMs = (_qg1.tv_sec - _qg0.tv_sec)*1000.0 + (_qg1.tv_nsec - _qg0.tv_nsec)/1e6;
-    double resultMs = (_qr1.tv_sec - _qr0.tv_sec)*1000.0 + (_qr1.tv_nsec - _qr0.tv_nsec)/1e6;
-    g_queryTotalMs += totalMs;
-    g_queryGraphMs += graphMs;
-    g_queryResultMs += resultMs;
+  rc = SQLITE_OK;
+out:
+  clock_gettime(CLOCK_MONOTONIC, &_qd0);
+  diskAnnSearchCtxDeinit(&ctx);
+  clock_gettime(CLOCK_MONOTONIC, &_qd1);
+  if( rc == SQLITE_OK ){
+    clock_gettime(CLOCK_MONOTONIC, &_q1);
+    g_queryCount++;
+    g_queryTotalMs += diskAnnMsBetween(&_q0, &_q1);
+    g_queryStartNodeMs += diskAnnMsBetween(&_qs0, &_qs1);
+    g_queryCtxInitMs += diskAnnMsBetween(&_qi0, &_qi1);
+    g_queryGraphMs += diskAnnMsBetween(&_qg0, &_qg1);
+    g_queryResultMs += diskAnnMsBetween(&_qr0, &_qr1);
+    g_queryCtxDeinitMs += diskAnnMsBetween(&_qd0, &_qd1);
     g_queryBlobReadMs += (blobReadAfter - blobReadBefore);
+    g_queryBlobOpenMs += (blobOpenAfter - blobOpenBefore);
+    g_queryBlobReopenMs += (blobReopenAfter - blobReopenBefore);
+    g_queryBlobReadCallMs += (blobReadCallAfter - blobReadCallBefore);
+    g_queryBlobCacheHits += (blobCacheHitAfter - blobCacheHitBefore);
+    g_queryBlobCacheMisses += (blobCacheMissAfter - blobCacheMissBefore);
     g_queryBlobReads += (blobReadCountAfter - blobReadCountBefore);
     g_queryNodesVisited += (visitedAfter - visitedBefore);
     g_queryEdgesExamined += (edgesAfter - edgesBefore);
   }
-
-  rc = SQLITE_OK;
-out:
-  clock_gettime(CLOCK_MONOTONIC, &_q1);
-  diskAnnSearchCtxDeinit(&ctx);
   return rc;
 }
 
@@ -1665,6 +1742,7 @@ int diskAnnInsert(
   }
 
   // note: we must select random row before we will insert new row in the shadow table
+  clock_gettime(CLOCK_MONOTONIC, &_ts0);
   rc = diskAnnSelectRandomShadowRow(pIndex, &nStartRowid);
   if( rc == SQLITE_DONE ){
     first = 1;
@@ -1677,7 +1755,6 @@ int diskAnnInsert(
     buildReadStart = g_totalBlobReadMs;
     buildWriteStart = g_totalBlobWriteMs;
     buildDistStart = g_buildDistanceMs;
-    clock_gettime(CLOCK_MONOTONIC, &_ts0);
     g_distTimingMode = 2;
     rc = diskAnnSearchInternal(pIndex, &ctx, nStartRowid, pzErrMsg);
     g_distTimingMode = 0;
@@ -1950,36 +2027,91 @@ int diskAnnOpenIndex(
 static void diskAnnPrintSearchStats(void){
   if( g_queryCount > 0 ){
     double avgTotal = g_queryTotalMs / g_queryCount;
+    double avgCtxInit = g_queryCtxInitMs / g_queryCount;
     double avgGraph = g_queryGraphMs / g_queryCount;
     double avgResult = g_queryResultMs / g_queryCount;
+    double avgCtxDeinit = g_queryCtxDeinitMs / g_queryCount;
     double avgBlobRead = g_queryBlobReadMs / g_queryCount;
     double avgDist = g_queryDistanceMs / g_queryCount;
     double qps = g_queryTotalMs > 0 ? g_queryCount / (g_queryTotalMs / 1000.0) : 0;
     fprintf(stderr, "\n=== diskAnn search breakdown (%d queries) ===\n", g_queryCount);
     fprintf(stderr, "  total:          %8.1f ms  (avg %.3f ms/q, %.0f q/s)\n",
             g_queryTotalMs, avgTotal, qps);
+    fprintf(stderr, "  context init:   %8.1f ms  (avg %.3f ms/q, %5.1f%%)\n",
+            g_queryCtxInitMs, avgCtxInit, g_queryCtxInitMs/g_queryTotalMs*100);
     fprintf(stderr, "  graph traversal:%8.1f ms  (avg %.3f ms/q, %5.1f%%)\n",
             g_queryGraphMs, avgGraph, g_queryGraphMs/g_queryTotalMs*100);
-    fprintf(stderr, "    query read I/O:%7.1f ms  (avg %.3f ms/q, %5.1f%% of graph)\n",
+    fprintf(stderr, "    query blob read path:%7.1f ms  (avg %.3f ms/q, %5.1f%% of graph)\n",
             g_queryBlobReadMs, avgBlobRead,
             g_queryGraphMs > 0 ? g_queryBlobReadMs/g_queryGraphMs*100 : 0);
+    fprintf(stderr, "      blob open:   %8.1f ms\n", g_queryBlobOpenMs);
+    fprintf(stderr, "      blob reopen: %8.1f ms\n", g_queryBlobReopenMs);
+    fprintf(stderr, "      blob read:   %8.1f ms  (cache hit/miss %d/%d)\n",
+            g_queryBlobReadCallMs, g_queryBlobCacheHits, g_queryBlobCacheMisses);
     fprintf(stderr, "    query distance:%6.1f ms  (avg %.3f ms/q, %5.1f%% of graph)\n",
             g_queryDistanceMs, avgDist,
             g_queryGraphMs > 0 ? g_queryDistanceMs/g_queryGraphMs*100 : 0);
     fprintf(stderr, "  result collect: %8.1f ms  (avg %.3f ms/q, %5.1f%%)\n",
             g_queryResultMs, avgResult, g_queryResultMs/g_queryTotalMs*100);
+    fprintf(stderr, "  context deinit: %8.1f ms  (avg %.3f ms/q, %5.1f%%)\n",
+            g_queryCtxDeinitMs, avgCtxDeinit, g_queryCtxDeinitMs/g_queryTotalMs*100);
+    fprintf(stderr, "  vector search total:%5.1f ms\n", g_vectorSearchTotalMs);
+    fprintf(stderr, "    vector parse: %8.1f ms\n", g_vectorSearchParseMs);
+    fprintf(stderr, "    index lookup/open:%5.1f ms\n", g_vectorSearchLookupMs);
+    fprintf(stderr, "    diskAnn call: %8.1f ms\n", g_vectorSearchDiskAnnMs);
+    fprintf(stderr, "    vector cleanup:%7.1f ms\n", g_vectorSearchCloseMs);
     fprintf(stderr, "================================================\n");
   }
 }
 
+void diskAnnRecordVectorSearch(double totalMs, double parseMs, double lookupMs,
+                               double diskAnnMs, double closeMs){
+  g_vectorSearchTotalMs += totalMs;
+  g_vectorSearchParseMs += parseMs;
+  g_vectorSearchLookupMs += lookupMs;
+  g_vectorSearchDiskAnnMs += diskAnnMs;
+  g_vectorSearchCloseMs += closeMs;
+}
+
+void diskAnnRecordInsertStmt(double ms){
+  g_totalInsertStmtMs += ms;
+  g_totalInsertStmtCount++;
+}
+
+void diskAnnRecordInsertOther(double ms){
+  g_totalInsertOtherMs += ms;
+}
+
+void diskAnnRecordInsertFinish(double ms){
+  g_totalInsertFinishMs += ms;
+}
+
+void diskAnnRecordIndexBuildTotal(double ms){
+  g_totalIndexBuildMs += ms;
+  g_totalIndexBuildCount++;
+}
+
 static void diskAnnPrintInsertStats(void){
   if( g_totalInsertCount > 0 ){
-    double buildTotal = g_totalSearchMs + g_totalPass1Ms + g_totalPass2Ms + g_totalFlushMs;
+    double graphBuild = g_totalSearchMs + g_totalPass1Ms + g_totalPass2Ms + g_totalFlushMs;
+    double graphTraversal = g_totalSearchMs;
+    double edgeUpdate = g_totalPass1Ms + g_totalPass2Ms + g_totalFlushMs;
+    double diskAnnCoreBuild = g_totalShadowInsMs + graphBuild;
+    double indexBuildTotal = g_totalIndexBuildMs > 0 ? g_totalIndexBuildMs : diskAnnCoreBuild;
     fprintf(stderr, "\n=== diskAnn insert breakdown (%d inserts) ===\n", g_totalInsertCount);
-    fprintf(stderr, "  table insert:   %8.1f ms\n", g_totalShadowInsMs);
-    fprintf(stderr, "  index build:    %8.1f ms\n", buildTotal);
-    fprintf(stderr, "    build read I/O:%7.1f ms\n", g_totalBuildReadMs);
-    fprintf(stderr, "    build write I/O:%6.1f ms\n", g_totalBuildWriteMs);
+    fprintf(stderr, "  insert statement total:%7.1f ms  (%d stmts)\n",
+            g_totalInsertStmtMs, g_totalInsertStmtCount);
+    fprintf(stderr, "  VDBE work:         %8.1f ms\n", g_totalInsertOtherMs);
+    fprintf(stderr, "  statement finish:  %8.1f ms\n", g_totalInsertFinishMs);
+    fprintf(stderr, "  vector index build:  %8.1f ms  (%d ops)\n",
+            indexBuildTotal, g_totalIndexBuildCount);
+    fprintf(stderr, "    diskAnn core build:%8.1f ms\n", diskAnnCoreBuild);
+    fprintf(stderr, "    shadow row insert: %8.1f ms\n", g_totalShadowInsMs);
+    fprintf(stderr, "    graph build/update:%8.1f ms\n", graphBuild);
+    fprintf(stderr, "      build graph traversal:%7.1f ms\n", graphTraversal);
+    fprintf(stderr, "      build edge update:    %7.1f ms\n", edgeUpdate);
+    fprintf(stderr, "    build blob read path:%7.1f ms\n", g_totalBuildReadMs);
+    fprintf(stderr, "    build blob write path:%6.1f ms\n", g_totalBuildWriteMs);
     fprintf(stderr, "    build distance:%7.1f ms\n", g_totalBuildDistMs);
     fprintf(stderr, "    LSM work during build: 0.0 ms\n");
     fprintf(stderr, "================================================\n");

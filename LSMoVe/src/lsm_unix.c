@@ -151,12 +151,13 @@ static int lsmPosixOsRead(
   int rc = LSM_OK;
   PosixFile *p = (PosixFile *)pFile;
   off_t offset;
+  ssize_t prc;
 
   offset = lseek(p->fd, (off_t)iOff, SEEK_SET);
   if( offset!=iOff ){
     rc = LSM_IOERR_BKPT;
   }else{
-    ssize_t prc = read(p->fd, pData, (size_t)nData);
+    prc = read(p->fd, pData, (size_t)nData);
     if( prc<0 ){ 
       rc = LSM_IOERR_BKPT;
     }else if( prc<nData ){

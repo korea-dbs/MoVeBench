@@ -504,17 +504,78 @@ def parse_diskann_stats(stderr_text):
             stats[key] = conv(m.group(1))
 
     # Insert breakdown
-    grab(r'table insert:\s*([\d.]+)\s+ms', 'table_insert_ms')
+    grab(r'insert statement total:\s*([\d.]+)\s+ms', 'insert_stmt_total_ms')
+    grab(r'VDBE work:\s*([\d.]+)\s+ms', 'insert_vdbe_work_ms')
+    grab(r'insert VDBE other:\s*([\d.]+)\s+ms', 'insert_vdbe_work_ms')
+    grab(r'statement finish:\s*([\d.]+)\s+ms', 'insert_stmt_finish_ms')
+    grab(r'shell db close:\s*([\d.]+)\s+ms', 'shell_close_ms')
+    grab(r'shell statements:\s*(\d+)', 'shell_stmt_count', int)
+    grab(r'shell prepare:\s*([\d.]+)\s+ms', 'shell_prepare_ms')
+    grab(r'shell step:\s*([\d.]+)\s+ms', 'shell_step_ms')
+    grab(r'shell finalize:\s*([\d.]+)\s+ms', 'shell_finalize_ms')
+    grab(r'shell other:\s*([\d.]+)\s+ms', 'shell_other_ms')
+    grab(r'step top-level calls:\s*(\d+)', 'step_top_count', int)
+    grab(r'step api total:\s*([\d.]+)\s+ms', 'step_api_ms')
+    grab(r'step core total:\s*([\d.]+)\s+ms', 'step_core_ms')
+    grab(r'step mutex enter:\s*([\d.]+)\s+ms', 'step_mutex_enter_ms')
+    grab(r'step mutex leave:\s*([\d.]+)\s+ms', 'step_mutex_leave_ms')
+    grab(r'step auto reset:\s*([\d.]+)\s+ms', 'step_auto_reset_ms')
+    grab(r'step ready setup:\s*([\d.]+)\s+ms', 'step_ready_ms')
+    grab(r'step vdbe list:\s*([\d.]+)\s+ms', 'step_vdbe_list_ms')
+    grab(r'step vdbe exec:\s*([\d.]+)\s+ms', 'step_vdbe_exec_ms')
+    grab(r'step profile:\s*([\d.]+)\s+ms', 'step_profile_ms')
+    grab(r'step wal callback:\s*([\d.]+)\s+ms', 'step_wal_ms')
+    grab(r'step transfer error:\s*([\d.]+)\s+ms', 'step_transfer_ms')
+    grab(r'step api exit:\s*([\d.]+)\s+ms', 'step_api_exit_ms')
+    grab(r'step reprepare:\s*([\d.]+)\s+ms', 'step_reprepare_ms')
+    grab(r'step reset:\s*([\d.]+)\s+ms', 'step_reset_ms')
+    grab(r'step wrapper other:\s*([\d.]+)\s+ms', 'step_wrapper_other_ms')
+    grab(r'non-index insert remainder:\s*([\d.]+)\s+ms', 'non_index_insert_ms')
+    grab(r'base table insert:\s*([\d.]+)\s+ms', 'non_index_insert_ms')
+    grab(r'table insert:\s*([\d.]+)\s+ms', 'non_index_insert_ms')
+    grab(r'shadow (?:row|table) insert:\s*([\d.]+)\s+ms', 'shadow_insert_ms')
+    grab(r'vector index build:\s*([\d.]+)\s+ms', 'build_total_ms')
     grab(r'index build:\s*([\d.]+)\s+ms', 'build_total_ms')
+    grab(r'graph build/update:\s*([\d.]+)\s+ms', 'graph_build_ms')
+    grab(r'build graph traversal:\s*([\d.]+)\s+ms', 'build_traversal_ms')
+    grab(r'build edge update:\s*([\d.]+)\s+ms', 'build_edge_update_ms')
+    grab(r'build KV read path:\s*([\d.]+)\s+ms', 'build_read_ms')
+    grab(r'build blob read path:\s*([\d.]+)\s+ms', 'build_read_ms')
     grab(r'build read I/O:\s*([\d.]+)\s+ms', 'build_read_ms')
+    grab(r'build KV write path:\s*([\d.]+)\s+ms', 'build_write_ms')
+    grab(r'build blob write path:\s*([\d.]+)\s+ms', 'build_write_ms')
     grab(r'build write I/O:\s*([\d.]+)\s+ms', 'build_write_ms')
     grab(r'build distance:\s*([\d.]+)\s+ms', 'build_dist_ms')
-    grab(r'LSM work during build:\s*([\d.]+)\s+ms', 'build_lsm_ms')
+    grab(r'LSM auto-compaction during insert:\s*([\d.]+)\s+ms', 'insert_lsm_compact_ms')
+    grab(r'LSM page compress:\s*([\d.]+)\s+ms', 'lsm_page_compress_ms')
+    grab(r'LSM page decompress:\s*([\d.]+)\s+ms', 'lsm_page_decompress_ms')
     # Query stats
+    grab(r'total:\s*([\d.]+)\s+ms', 'search_total_ms')
+    grab(r'context init:\s*([\d.]+)\s+ms', 'ctx_init_ms')
     grab(r'graph traversal:\s*([\d.]+)\s+ms', 'graph_ms')
+    grab(r'query KV read path:\s*([\d.]+)\s+ms', 'query_read_ms')
+    grab(r'query blob read path:\s*([\d.]+)\s+ms', 'query_read_ms')
     grab(r'query read I/O:\s*([\d.]+)\s+ms', 'query_read_ms')
+    grab(r'blob open:\s*([\d.]+)\s+ms', 'blob_open_ms')
+    grab(r'blob reopen:\s*([\d.]+)\s+ms', 'blob_reopen_ms')
+    grab(r'blob read:\s*([\d.]+)\s+ms', 'blob_read_call_ms')
+    m_cache = re.search(r'blob read:\s*[\d.]+\s+ms\s+\(cache hit/miss\s+(\d+)/(\d+)\)', stderr_text)
+    if m_cache:
+        stats['blob_cache_hits'] = int(m_cache.group(1))
+        stats['blob_cache_misses'] = int(m_cache.group(2))
+    grab(r'KV cursor open:\s*([\d.]+)\s+ms', 'kv_cursor_open_ms')
+    grab(r'KV seek:\s*([\d.]+)\s+ms', 'kv_seek_ms')
+    grab(r'KV data:\s*([\d.]+)\s+ms', 'kv_data_ms')
+    grab(r'KV decode:\s*([\d.]+)\s+ms', 'kv_decode_ms')
+    grab(r'KV memcpy:\s*([\d.]+)\s+ms', 'kv_memcpy_ms')
     grab(r'query distance:\s*([\d.]+)\s+ms', 'query_dist_ms')
     grab(r'result collect:\s*([\d.]+)\s+ms', 'result_ms')
+    grab(r'context deinit:\s*([\d.]+)\s+ms', 'ctx_deinit_ms')
+    grab(r'vector search total:\s*([\d.]+)\s+ms', 'vector_search_total_ms')
+    grab(r'vector parse:\s*([\d.]+)\s+ms', 'vector_parse_ms')
+    grab(r'index lookup/open:\s*([\d.]+)\s+ms', 'index_lookup_ms')
+    grab(r'diskAnn call:\s*([\d.]+)\s+ms', 'diskann_call_ms')
+    grab(r'vector cleanup:\s*([\d.]+)\s+ms', 'vector_cleanup_ms')
     grab(r'([\d.]+)\s+q/s', 'qps')
     return stats
 
@@ -566,7 +627,8 @@ def format_io_summary(io_stats):
 def run_one_config(label, shell, compact_bin, insert_sql_path, query_sql_path,
                    gt_results, k, db_dir, is_sqlite3=False, use_compaction=True,
                    do_drop_cache=False, io_log_dir=None,
-                   page_size_kb=None, lsm_compression="none", disk_device=DISK_DEVICE):
+                   page_size_kb=None, lsm_compression="none", disk_device=DISK_DEVICE,
+                   query_only=False):
     db_path = os.path.join(db_dir, f"bench_{label}.db")
     db_target = build_db_target(
         db_path,
@@ -575,13 +637,16 @@ def run_one_config(label, shell, compact_bin, insert_sql_path, query_sql_path,
         lsm_compression=lsm_compression,
         use_compaction=use_compaction,
     )
-    cleanup_db(db_path, is_sqlite3)
+    if not query_only:
+        cleanup_db(db_path, is_sqlite3)
+    elif not os.path.exists(db_path):
+        raise FileNotFoundError(f"query-only DB not found: {db_path}")
     child_env = os.environ.copy()
     child_env["DISKANN_IO_TIMING"] = "1"
 
     result = {"label": label}
-    need_compact = not is_sqlite3 and use_compaction and compact_bin
-    n_phases = 4 if need_compact else 3
+    need_compact = not query_only and not is_sqlite3 and use_compaction and compact_bin
+    n_phases = 2 if query_only else (4 if need_compact else 3)
 
     print(f"\n{'='*60}")
     print(f"  Config: {label}")
@@ -592,58 +657,97 @@ def run_one_config(label, shell, compact_bin, insert_sql_path, query_sql_path,
         print(f"  Compact: {compact_bin}")
     print(f"{'='*60}")
 
-    print(f"  [1/{n_phases}] Schema + Insert...")
-
-    # Keep schema and inserts in one shell session so LSM lock state and any
-    # transaction statements in the SQL file stay in their original order.
-    insert_sql = read_sql(insert_sql_path)
-    drop_caches(do_drop_cache)
-    insert_log = os.path.join(io_log_dir, f"{label}_insert_io.csv") if io_log_dir else None
-    insert_mon = DiskStatsMonitor(disk_device, log_path=insert_log).start()
-    t0 = time.time()
-    ins_out, ins_err, ins_time = run_shell(shell, db_target, insert_sql, env=child_env)
-    t_insert = time.time() - t0
-    result["insert_disk_io"] = insert_mon.stop()
-
-    # Check for silent SQL errors (shell continues past errors but sets gHasError)
-    err_lines = [l for l in ins_err.splitlines() if l.startswith("Error:")]
-    if err_lines:
-        print(f"        !! {len(err_lines)} SQL errors during schema/insert:")
-        for l in err_lines[:5]:
-            print(f"           {l}")
-        if len(err_lines) > 5:
-            print(f"           ... ({len(err_lines)-5} more)")
-        raise RuntimeError(f"schema/insert phase had {len(err_lines)} SQL errors")
-
     size_before = file_size_mb(db_path)
-    result["insert_time_s"] = round(t_insert, 2)
     result["insert_size_mb"] = round(size_before, 1)
-    result["insert_time_stats"] = ins_time
-    ins_stats = parse_diskann_stats(ins_err)
-    result["ins_stats"] = ins_stats
-    print(f"        {t_insert:.1f}s, {size_before:.1f} MB")
-    if ins_time:
-        print(
-            f"        time: real={ins_time.get('real_s', 0):.2f}s  "
-            f"user={ins_time.get('user_s', 0):.2f}s  "
-            f"sys={ins_time.get('sys_s', 0):.2f}s"
-        )
-    if ins_stats.get('build_total_ms') is not None:
-        table_s = ins_stats.get('table_insert_ms', 0) / 1000
-        build_s = ins_stats.get('build_total_ms', 0) / 1000
-        read_s = ins_stats.get('build_read_ms', 0) / 1000
-        write_s = ins_stats.get('build_write_ms', 0) / 1000
-        dist_s = ins_stats.get('build_dist_ms', 0) / 1000
-        lsm_s = ins_stats.get('build_lsm_ms', 0) / 1000
-        print(
-            f"        TableIns={table_s:.1f}s  "
-            f"IndexBuild={build_s:.1f}s  BuildRead={read_s:.1f}s  "
-            f"BuildWrite={write_s:.1f}s  BuildDist={dist_s:.1f}s  "
-            f"LSMWork={lsm_s:.1f}s"
-        )
-    print(f"        {format_io_summary(result['insert_disk_io'])}")
-    for block in extract_c_stat_blocks(ins_err):
-        print(block)
+    result["insert_time_s"] = 0.0
+    result["insert_time_stats"] = {}
+    result["ins_stats"] = {}
+
+    if query_only:
+        print(f"  Using existing DB: {db_path} ({size_before:.1f} MB)")
+    else:
+        print(f"  [1/{n_phases}] Schema + Insert...")
+
+        # Keep schema and inserts in one shell session so LSM lock state and any
+        # transaction statements in the SQL file stay in their original order.
+        insert_sql = read_sql(insert_sql_path)
+        drop_caches(do_drop_cache)
+        insert_log = os.path.join(io_log_dir, f"{label}_insert_io.csv") if io_log_dir else None
+        insert_mon = DiskStatsMonitor(disk_device, log_path=insert_log).start()
+        t0 = time.time()
+        ins_out, ins_err, ins_time = run_shell(shell, db_target, insert_sql, env=child_env)
+        t_insert = time.time() - t0
+        result["insert_disk_io"] = insert_mon.stop()
+
+        # Check for silent SQL errors (shell continues past errors but sets gHasError)
+        err_lines = [l for l in ins_err.splitlines() if l.startswith("Error:")]
+        if err_lines:
+            print(f"        !! {len(err_lines)} SQL errors during schema/insert:")
+            for l in err_lines[:5]:
+                print(f"           {l}")
+            if len(err_lines) > 5:
+                print(f"           ... ({len(err_lines)-5} more)")
+            raise RuntimeError(f"schema/insert phase had {len(err_lines)} SQL errors")
+
+        size_before = file_size_mb(db_path)
+        result["insert_time_s"] = round(t_insert, 2)
+        result["insert_size_mb"] = round(size_before, 1)
+        result["insert_time_stats"] = ins_time
+        ins_stats = parse_diskann_stats(ins_err)
+        result["ins_stats"] = ins_stats
+        print(f"        {t_insert:.1f}s, {size_before:.1f} MB")
+        if ins_time:
+            print(
+                f"        time: real={ins_time.get('real_s', 0):.2f}s  "
+                f"user={ins_time.get('user_s', 0):.2f}s  "
+                f"sys={ins_time.get('sys_s', 0):.2f}s"
+            )
+        if ins_stats.get('build_total_ms') is not None:
+            stmt_s = ins_stats.get('insert_stmt_total_ms', 0) / 1000
+            finish_s = ins_stats.get('insert_stmt_finish_ms', 0) / 1000
+            wal_s = ins_stats.get('step_wal_ms', 0) / 1000
+            build_s = ins_stats.get('build_total_ms', 0) / 1000
+            shadow_s = ins_stats.get('shadow_insert_ms', 0) / 1000
+            graph_s = ins_stats.get('graph_build_ms', 0) / 1000
+            traversal_s = ins_stats.get('build_traversal_ms', 0) / 1000
+            edge_update_s = ins_stats.get('build_edge_update_ms', 0) / 1000
+            read_s = ins_stats.get('build_read_ms', 0) / 1000
+            write_s = ins_stats.get('build_write_ms', 0) / 1000
+            dist_s = ins_stats.get('build_dist_ms', 0) / 1000
+            lsm_compact_s = ins_stats.get('insert_lsm_compact_ms', 0) / 1000
+            pg_comp_s = ins_stats.get('lsm_page_compress_ms', 0) / 1000
+            pg_decomp_s = ins_stats.get('lsm_page_decompress_ms', 0) / 1000
+            print(
+                f"        Stmt={stmt_s:.1f}s  Commit={finish_s:.1f}s  "
+                f"Checkpt={wal_s:.1f}s  VecBuild={build_s:.1f}s  "
+                f"Shadow={shadow_s:.1f}s  GraphBuild={graph_s:.1f}s  "
+                f"BuildTrav={traversal_s:.1f}s  EdgeUpd={edge_update_s:.1f}s  "
+                f"ReadPath={read_s:.1f}s  WritePath={write_s:.1f}s  Dist={dist_s:.1f}s  "
+                f"LSMComp={lsm_compact_s:.1f}s  PgComp={pg_comp_s:.1f}s  "
+                f"PgDecomp={pg_decomp_s:.1f}s"
+            )
+            if ins_stats.get('step_api_ms') is not None:
+                print(
+                    f"        StepApi={ins_stats.get('step_api_ms', 0)/1000:.1f}s  "
+                    f"StepCore={ins_stats.get('step_core_ms', 0)/1000:.1f}s  "
+                    f"StepExec={ins_stats.get('step_vdbe_exec_ms', 0)/1000:.1f}s  "
+                    f"StepReady={ins_stats.get('step_ready_ms', 0)/1000:.1f}s  "
+                    f"StepAutoReset={ins_stats.get('step_auto_reset_ms', 0)/1000:.1f}s  "
+                    f"StepReset={ins_stats.get('step_reset_ms', 0)/1000:.1f}s  "
+                    f"StepReprep={ins_stats.get('step_reprepare_ms', 0)/1000:.1f}s"
+                )
+                print(
+                    f"        StepMutex={ins_stats.get('step_mutex_enter_ms', 0)/1000:.1f}s/"
+                    f"{ins_stats.get('step_mutex_leave_ms', 0)/1000:.1f}s  "
+                    f"StepProfile={ins_stats.get('step_profile_ms', 0)/1000:.1f}s  "
+                    f"StepWal={ins_stats.get('step_wal_ms', 0)/1000:.1f}s  "
+                    f"StepXfer={ins_stats.get('step_transfer_ms', 0)/1000:.1f}s  "
+                    f"StepApiExit={ins_stats.get('step_api_exit_ms', 0)/1000:.1f}s  "
+                    f"StepOther={ins_stats.get('step_wrapper_other_ms', 0)/1000:.1f}s"
+                )
+        print(f"        {format_io_summary(result['insert_disk_io'])}")
+        for block in extract_c_stat_blocks(ins_err):
+            print(block)
 
     # Compact (LSMobiVec only)
     if need_compact:
@@ -676,7 +780,7 @@ def run_one_config(label, shell, compact_bin, insert_sql_path, query_sql_path,
         result["compact_size_mb"] = round(size_before, 1)
 
     # Query (timed)
-    phase_q = 3 if need_compact else 2
+    phase_q = 1 if query_only else (3 if need_compact else 2)
     print(f"  [{phase_q}/{n_phases}] Querying...")
     query_sql = read_sql(query_sql_path)
 
@@ -714,11 +818,37 @@ def run_one_config(label, shell, compact_bin, insert_sql_path, query_sql_path,
         )
     if q_stats.get('graph_ms'):
         print(
-            f"        Graph={q_stats.get('graph_ms', 0):.0f}ms  "
-            f"QueryRead={q_stats.get('query_read_ms', 0):.0f}ms  "
+            f"        SearchTotal={q_stats.get('search_total_ms', 0):.0f}ms  "
+            f"CtxInit={q_stats.get('ctx_init_ms', 0):.0f}ms  "
+            f"Graph={q_stats.get('graph_ms', 0):.0f}ms  "
+            f"ReadPath={q_stats.get('query_read_ms', 0):.0f}ms  "
             f"QueryDist={q_stats.get('query_dist_ms', 0):.0f}ms  "
-            f"Result={q_stats.get('result_ms', 0):.0f}ms"
+            f"Result={q_stats.get('result_ms', 0):.0f}ms  "
+            f"CtxDeinit={q_stats.get('ctx_deinit_ms', 0):.0f}ms"
         )
+        if q_stats.get('blob_read_call_ms') or q_stats.get('kv_seek_ms'):
+            print(
+                f"        BlobOpen={q_stats.get('blob_open_ms', 0):.0f}ms  "
+                f"BlobReopen={q_stats.get('blob_reopen_ms', 0):.0f}ms  "
+                f"BlobRead={q_stats.get('blob_read_call_ms', 0):.0f}ms  "
+                f"KVSeek={q_stats.get('kv_seek_ms', 0):.0f}ms  "
+                f"KVData={q_stats.get('kv_data_ms', 0):.0f}ms  "
+                f"KVDecode={q_stats.get('kv_decode_ms', 0):.0f}ms  "
+                f"KVMemcpy={q_stats.get('kv_memcpy_ms', 0):.0f}ms"
+            )
+        if q_stats.get('vector_search_total_ms'):
+            print(
+                f"        VecSearch={q_stats.get('vector_search_total_ms', 0):.0f}ms  "
+                f"VecParse={q_stats.get('vector_parse_ms', 0):.0f}ms  "
+                f"IdxLookup={q_stats.get('index_lookup_ms', 0):.0f}ms  "
+                f"DiskAnnCall={q_stats.get('diskann_call_ms', 0):.0f}ms  "
+                f"VecCleanup={q_stats.get('vector_cleanup_ms', 0):.0f}ms"
+            )
+        if q_stats.get('lsm_page_compress_ms') or q_stats.get('lsm_page_decompress_ms'):
+            print(
+                f"        PgComp={q_stats.get('lsm_page_compress_ms', 0):.0f}ms  "
+                f"PgDecomp={q_stats.get('lsm_page_decompress_ms', 0):.0f}ms"
+            )
     print(f"        {format_io_summary(result['query_disk_io'])}")
     for block in extract_c_stat_blocks(q_err):
         print(block)
@@ -768,6 +898,10 @@ def main():
                         help="Block device name from /proc/diskstats, or 'auto' to detect from --db-dir")
     parser.add_argument("--io-log-dir", type=str, default="./io_logs",
                         help="Directory to store disk I/O CSV logs")
+    parser.add_argument("--query-only", action="store_true",
+                        help="Run query and recall only using existing bench_*.db files")
+    parser.add_argument("--keep-db", action="store_true",
+                        help="Keep generated bench_*.db files after all runs")
     args = parser.parse_args()
 
     page_sizes_kb = [int(x) for x in args.page_sizes.split(",")]
@@ -782,7 +916,8 @@ def main():
         insert_sql = os.path.join(args.dataset_dir, f"insert100k_{name}.sql")
         query_sql = os.path.join(args.dataset_dir, f"query10k_{name}.sql")
         gt_file = os.path.join(args.dataset_dir, f"groundtruth_{name}.txt")
-        missing = [f for f in [insert_sql, query_sql, gt_file] if not os.path.isfile(f)]
+        required = [query_sql, gt_file] if args.query_only else [insert_sql, query_sql, gt_file]
+        missing = [f for f in required if not os.path.isfile(f)]
         if missing:
             print(f"Warning: skipping dataset '{name}', missing: {missing}")
             continue
@@ -847,32 +982,37 @@ def main():
         ds_results = []
         for label, shell, compact_bin, is_s3, ps_kb in configs:
             run_label = f"{ds_name}_{label}"
-            insert_sql_text = read_sql(insert_sql)
-            prepared_sql = prepare_insert_sql(
-                insert_sql_text,
-                ps_kb,
-                is_sqlite3=is_s3,
-                use_compaction=use_compaction,
-                lsm_autoflush_mb=args.lsm_autoflush_mb,
-            )
-            insert_sql_prepared = os.path.join(args.db_dir, f".schema_{run_label}.sql")
-            with open(insert_sql_prepared, "w") as f:
-                f.write(prepared_sql + "\n")
+            insert_sql_prepared = None
+            if not args.query_only:
+                insert_sql_text = read_sql(insert_sql)
+                prepared_sql = prepare_insert_sql(
+                    insert_sql_text,
+                    ps_kb,
+                    is_sqlite3=is_s3,
+                    use_compaction=use_compaction,
+                    lsm_autoflush_mb=args.lsm_autoflush_mb,
+                )
+                insert_sql_prepared = os.path.join(args.db_dir, f".schema_{run_label}.sql")
+                with open(insert_sql_prepared, "w") as f:
+                    f.write(prepared_sql + "\n")
             result = run_one_config(
                 run_label, shell, compact_bin, insert_sql_prepared, query_sql,
                 gt_results, args.k, args.db_dir, is_sqlite3=is_s3,
                 use_compaction=use_compaction, do_drop_cache=args.drop_cache,
                 io_log_dir=args.io_log_dir, page_size_kb=ps_kb,
-                lsm_compression=args.lsm_compression, disk_device=disk_device
+                lsm_compression=args.lsm_compression, disk_device=disk_device,
+                query_only=args.query_only
             )
             ds_results.append(result)
 
-            # Clean up DB after results are recorded to free disk space
             db_path = os.path.join(args.db_dir, f"bench_{run_label}.db")
-            cleanup_db(db_path, is_sqlite3=is_s3)
-            if os.path.exists(insert_sql_prepared):
+            if insert_sql_prepared and os.path.exists(insert_sql_prepared):
                 os.remove(insert_sql_prepared)
-            print(f"  Cleaned up {db_path}")
+            if args.keep_db:
+                print(f"  Kept DB {db_path}")
+            else:
+                cleanup_db(db_path, is_sqlite3=is_s3)
+                print(f"  Cleaned up {db_path}")
 
         all_results[ds_name] = ds_results
 
@@ -880,23 +1020,33 @@ def main():
     show_compact = use_compaction
     for ds_name, ds_results in all_results.items():
         ins_hdr = (
-            f"{'Overall':>8} {'Table':>8} {'Build':>8} {'ReadIO':>8} "
-            f"{'WriteIO':>8} {'Dist':>8} {'LSM':>8}"
+            f"{'Overall':>8} {'Stmt':>8} {'Commit':>8} {'Checkpt':>8} "
+            f"{'VecBuild':>8} {'Shadow':>8} {'Trav':>8} {'EdgeUpd':>8} "
+            f"{'ReadPath':>8} "
+            f"{'WritePath':>9} {'Dist':>8} {'LSMComp':>8} {'PgComp':>8} {'PgDecomp':>8}"
         )
-        ins_sub = f"{'(s)':>8} {'(s)':>8} {'(s)':>8} {'(s)':>8} {'(s)':>8} {'(s)':>8} {'(s)':>8}"
+        ins_sub = (
+            f"{'(s)':>8} {'(s)':>8} {'(s)':>8} {'(s)':>8} "
+            f"{'(s)':>8} {'(s)':>8} {'(s)':>8} {'(s)':>8} "
+            f"{'(s)':>8} {'(s)':>9} {'(s)':>8} {'(s)':>8} {'(s)':>8} {'(s)':>8}"
+        )
         if show_compact:
             ins_hdr += f" {'Compact':>8}"
             ins_sub += f" {'(s)':>8}"
         q_hdr = (
-            f"{'Overall':>8} {'Graph':>8} {'ReadIO':>8} {'Dist':>8} "
-            f"{'Result':>8} {'Q/s':>8} {'Recall':>8}"
+            f"{'Overall':>8} {'Graph':>8} {'ReadPath':>8} {'Dist':>8} "
+            f"{'Result':>8} {'PgComp':>8} {'PgDecomp':>8} {'Q/s':>8} {'Recall':>8}"
         )
-        q_sub = f"{'(s)':>8} {'(ms)':>8} {'(ms)':>8} {'(ms)':>8} {'(ms)':>8} {'':>8} {'@k':>8}"
+        q_sub = (
+            f"{'(s)':>8} {'(ms)':>8} {'(ms)':>8} {'(ms)':>8} {'(ms)':>8} "
+            f"{'(ms)':>8} {'(ms)':>8} {'':>8} {'@k':>8}"
+        )
         hdr = f"{'Config':>16} |{ins_hdr} |{q_hdr} | {'Size':>8}"
         sub = f"{'':>16} |{ins_sub} |{q_sub} | {'(MB)':>8}"
         w = len(hdr)
+        title = f"SUMMARY: {ds_name} (k={args.k})"
         print(f"\n{'='*w}")
-        print(f"  SUMMARY: {ds_name} (k={args.k})")
+        print(f"{title:^{w}}")
         print(f"{'='*w}")
         ins_w = len(ins_hdr) + 1
         q_w = len(q_hdr) + 1
@@ -907,16 +1057,27 @@ def main():
         for r in ds_results:
             short_label = r['label'].replace(f"{ds_name}_", "")
             ist = r.get('ins_stats', {})
-            table_s = ist.get('table_insert_ms', 0) / 1000
+            stmt_s = ist.get('insert_stmt_total_ms', 0) / 1000
+            finish_s = ist.get('insert_stmt_finish_ms', 0) / 1000
+            wal_s = ist.get('step_wal_ms', 0) / 1000
             build_s = ist.get('build_total_ms', 0) / 1000
+            shadow_s = ist.get('shadow_insert_ms', 0) / 1000
+            traversal_s = ist.get('build_traversal_ms', 0) / 1000
+            edge_update_s = ist.get('build_edge_update_ms', 0) / 1000
             read_s = ist.get('build_read_ms', 0) / 1000
             write_s = ist.get('build_write_ms', 0) / 1000
             dist_s = ist.get('build_dist_ms', 0) / 1000
-            lsm_s = ist.get('build_lsm_ms', 0) / 1000
+            lsm_compact_s = ist.get('insert_lsm_compact_ms', 0) / 1000
+            pg_comp_s = ist.get('lsm_page_compress_ms', 0) / 1000
+            pg_decomp_s = ist.get('lsm_page_decompress_ms', 0) / 1000
             qst = r.get('q_stats', {})
             ins_vals = (f"{r['insert_time_s']:>8.1f} "
-                        f"{table_s:>8.1f} {build_s:>8.1f} {read_s:>8.1f} "
-                        f"{write_s:>8.1f} {dist_s:>8.1f} {lsm_s:>8.1f}")
+                        f"{stmt_s:>8.1f} {finish_s:>8.1f} {wal_s:>8.1f} "
+                        f"{build_s:>8.1f} "
+                        f"{shadow_s:>8.1f} {traversal_s:>8.1f} {edge_update_s:>8.1f} "
+                        f"{read_s:>8.1f} "
+                        f"{write_s:>9.1f} {dist_s:>8.1f} {lsm_compact_s:>8.1f} "
+                        f"{pg_comp_s:>8.1f} {pg_decomp_s:>8.1f}")
             if show_compact:
                 compact_str = f"{r['compact_time_s']:>8.1f}" if r['compact_time_s'] > 0 else f"{'---':>8}"
                 ins_vals += f" {compact_str}"
@@ -926,6 +1087,8 @@ def main():
                 f"{qst.get('query_read_ms', 0):>8.1f} "
                 f"{qst.get('query_dist_ms', 0):>8.1f} "
                 f"{qst.get('result_ms', 0):>8.1f} "
+                f"{qst.get('lsm_page_compress_ms', 0):>8.1f} "
+                f"{qst.get('lsm_page_decompress_ms', 0):>8.1f} "
                 f"{r['query_per_sec']:>8.0f} {r['recall']:>8.4f}"
             )
             print(f"{short_label:>16} |{ins_vals} |{q_vals} | {r['compact_size_mb']:>8.1f}")
