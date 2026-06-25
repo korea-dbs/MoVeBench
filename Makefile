@@ -9,15 +9,15 @@ libsql: LibSQL/Makefile
 	$(MAKE) -C LibSQL
 
 lsmobivec:
-	$(MAKE) -C LSMobiVec
+	$(MAKE) -C LSMoVe
 
 compact: lsmobivec
-	$(CC) -O2 LSMobiVec/compact_db.c -ILSMobiVec -ILSMobiVec/src -LLSMobiVec \
-		-lsqlite4 -lpthread -lm -lz -llz4 -o LSMobiVec/compact_db
+	$(CC) -O2 LSMoVe/compact_db.c -ILSMoVe -ILSMoVe/src -LLSMoVe \
+		-lsqlite4 -lpthread -lm -lz -llz4 -o LSMoVe/compact_db
 
 clean:
 	@if [ -f LibSQL/Makefile ]; then \
 		$(MAKE) -C LibSQL clean; \
 	fi
-	$(MAKE) -C LSMobiVec clean
-	$(RM) LSMobiVec/compact_db
+	$(MAKE) -C LSMoVe clean
+	$(RM) LSMoVe/compact_db
