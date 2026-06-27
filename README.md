@@ -1,12 +1,13 @@
-# MoVesBench
+# MoVeBench : Mobile Vector Benchmark
 
-Overview of MoVesBench
+MoVeBench is an reproducible DiskANN benchmark tool that you can test with various on-device environments.
 
-### Datasets
 
-how to download test datasets
 
-### Build
+## Datasets
+
+
+## How To Run
 
 On the root directory, do
 

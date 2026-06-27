@@ -21,5 +21,3 @@ clean:
 	fi
 	$(MAKE) -C LSMoVe clean
 	$(RM) LSMoVe/compact_db
-	$(MAKE) -C LSMoVe clean
-	$(RM) LSMoVe/compact_db
