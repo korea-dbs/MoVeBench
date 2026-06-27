@@ -5,7 +5,7 @@
 Although several approximate nearest neighbor(ANN) benchmark tools have been released, few provide performance metrics that isolate the impact of different storage layers.
 By varying only the storage layer, MoVeBench enables a direct evaluation of the trade-offs between two widely used storage structures, B-Tree and LSM-Tree, in your on-device environment.
 
-MoVeBench uses [LibSQL](https://docs.turso.tech/libsql) as the B-tree-based baseline built on SQLite3, and LSMoVe, our port of LibSQL's DiskANN layer to [SQLite4](https://sqlite.org/src4/doc/trunk/www/index.wiki), to evaluate an LSM-tree-based storage layer.
+MoVeBench uses [libSQL](https://docs.turso.tech/libsql), which is a DiskANN implementation on top of SQLite3's B-Tree storage layer, and LSMoVe, which is our port of libSQL's DiskANN layer to [SQLite4](https://sqlite.org/src4/doc/trunk/www/index.wiki), to evaluate an LSM-Tree-based storage layer.
 
 ## Datasets
 
@@ -30,7 +30,7 @@ make -j
 You can also build each engines with the code below.
 
 ```
-make libsql     # LibSQL
+make libsql     # libSQL
 make lsmove     # LSMoVe
 make compact    # additional compaction code for LSMoVe
 ```
