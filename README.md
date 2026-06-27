@@ -89,6 +89,42 @@ We provided benchmark with some useful options.
     python benchmark.py
     ```
 
+### Run on Android Device (pixel_benchmark.py)
+
+`pixel_benchmark.py` runs the same benchmark on an Android device via `adb`. Binaries (`sqlite4`, `compact_db`, `sqlite3`) must be pre-built for the target device architecture (e.g., arm64) and pushed to the device beforehand.
+
+```bash
+python3 pixel_benchmark.py --adb-serial <device_serial>
+```
+
+| Option | Description | Default |
+| --- | --- | --- |
+| `dataset-dir` | Directory with SQL files (on host) | `./dataset` |
+| `datasets` | Dataset names separated by `,` | `sift,glove,coco,cohere` |
+| `sqlite4-dir` | Device path containing `sqlite4` and `compact_db` | `/data/local/sqlite4_lsm/MoVeBench` |
+| `sqlite3-dir` | Device path containing `sqlite3` | `/data/local/sqlite3_libsql/MoVeBench` |
+| `device-db-dir` | Device directory to store database files | `/data/local/tmp` |
+| `device-tmp-dir` | Device directory for temporary SQL files | `/data/local/tmp` |
+| `page-sizes` | Setting SQLite's page size (KB) | `4,16,32,64` |
+| `lsm-compression` | LSM storage page compression algorithm | `none` |
+| `lsm-use-compaction` | Use `compact_db` after insert for LSMoVe configs (`0`: skip, `1`: use) | `0` |
+| `lsm-autoflush-mb` | Set LSM autoflush threshold for LSMoVe configs (MB) | 256 MB |
+| `lsm-automerge` | Set LSM automerge segment threshold for LSMoVe configs | 4 |
+| `drop-cache` | Drop OS page cache before each phase — requires root (add `--drop-cache` to activate) | No |
+| `disk-device` | Block device name from `/proc/diskstats` | `sda` |
+| `search-only` | Run search and recall only using existing `bench_*.db` files on device (add `--search-only` to activate) | No |
+| `keep-db` | Keep DB files on device after all runs (add `--keep-db` to activate) | No |
+| `adb-serial` | ADB device serial from `adb devices`; omit if only one device is connected | None |
+| `shell-timeout` | Timeout in seconds for each `adb shell` command | `20000` |
+
+#### example
+
+```bash
+python3 pixel_benchmark.py --adb-serial 2B261FDH200B0M --datasets sift --page-sizes 4 --disk-device sda
+```
+
+---
+
 ### Other Configurations
 
 The following table shows the adjustable LSM configurations of SQLite4.
@@ -111,5 +147,42 @@ The following table shows the adjustable LSM configurations of SQLite4.
 | LSM_CONFIG_SET_COMPRESSION_FACTORY | Register a compression algorithms using `compression_id` | `LSM_COMPRESSION_NONE` |
 | LSM_CONFIG_GET_COMPRESSION | Get info of current compression algorithms | `LSM_COMPRESSION_NONE` |
 
-### 
-## Results 
+## Results
+
+The following results were obtained on a **Google Pixel** device (disk: `sda`) using `pixel_benchmark.py`, with a 4KB SQLite page size and no compaction.
+
+### Insert Time (s)
+
+| Dataset | LSMoVe (4KB) | libSQL (4KB) |
+|---------|-------------:|-------------:|
+| SIFT    | 184.8        | 611.7        |
+| GloVe   | 212.7        | 653.7        |
+| COCO    | 593.6        | 959.1        |
+| Cohere  | 733.0        | 1084.2       |
+
+### Search Time (s) & Throughput (Q/s)
+
+| Dataset | LSMoVe (4KB) | Q/s | libSQL (4KB) | Q/s |
+|---------|-------------:|----:|-------------:|----:|
+| SIFT    | 43.0         | 233 | 83.3         | 120 |
+| GloVe   | 47.8         | 209 | 84.0         | 119 |
+| COCO    | 71.2         | 140 | 80.2         | 125 |
+| Cohere  | 104.2        |  96 | 166.4        |  60 |
+
+### Recall@10
+
+| Dataset | LSMoVe (4KB) | libSQL (4KB) |
+|---------|-------------:|-------------:|
+| SIFT    | 98.68%       | 98.71%       |
+| GloVe   | 71.12%       | 71.04%       |
+| COCO    | 95.02%       | 94.98%       |
+| Cohere  | 91.69%       | 91.73%       |
+
+### DB Size (MB)
+
+| Dataset | LSMoVe (4KB) | libSQL (4KB) |
+|---------|-------------:|-------------:|
+| SIFT    | 1253.0       | 448.8        |
+| GloVe   | 1559.0       | 600.7        |
+| COCO    | 8092.0       | 1620.7       |
+| Cohere  | 6967.0       | 2346.9       |
