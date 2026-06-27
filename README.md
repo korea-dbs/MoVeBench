@@ -1,4 +1,4 @@
-# MoVeBench : Mobile Vector Benchmark
+# MoVeBench : A Mobile Vector Benchmark
 
 **MoVeBench** is a DiskANN benchmark tool for on-device environments.
 
