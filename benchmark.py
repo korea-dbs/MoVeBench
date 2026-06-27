@@ -9,6 +9,7 @@ from datetime import datetime
 
 TIME_MARKER = "__TIME__"
 DISK_DEVICE = "mmcblk0p1"
+TOP_K = 10
 
 
 def _diskstats_devices():
@@ -880,7 +881,6 @@ def main():
                         help="Directory with SQL files (default: ./dataset)")
     parser.add_argument("--datasets", type=str, default="sift,glove,coco,cohere",
                         help="Comma-separated dataset names (default: sift,glove,coco,cohere)")
-    parser.add_argument("--k", type=int, default=10)
     parser.add_argument("--sqlite4-dir", type=str, default="./LSMoVe",
                         help="Directory containing the LSMoVe/sqlite4 shell and optional compact_db")
     parser.add_argument("--sqlite3-dir", type=str, default="./LibSQL",
@@ -1002,7 +1002,7 @@ def main():
                     f.write(prepared_sql + "\n")
             result = run_one_config(
                 run_label, shell, compact_bin, insert_sql_prepared, query_sql,
-                gt_results, args.k, args.db_dir, is_sqlite3=is_s3,
+                gt_results, TOP_K, args.db_dir, is_sqlite3=is_s3,
                 use_compaction=use_compaction, do_drop_cache=args.drop_cache,
                 page_size_kb=ps_kb, lsm_compression=args.lsm_compression,
                 disk_device=disk_device,
@@ -1049,7 +1049,7 @@ def main():
         hdr = f"{'Config':>16} |{ins_hdr} |{q_hdr} | {'Size':>8}"
         sub = f"{'':>16} |{ins_sub} |{q_sub} | {'(MB)':>8}"
         w = len(hdr)
-        title = f"SUMMARY: {ds_name} (k={args.k})"
+        title = f"SUMMARY: {ds_name} (k={TOP_K})"
         print(f"\n{'='*w}")
         print(f"{title:^{w}}")
         print(f"{'='*w}")

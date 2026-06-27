@@ -19,17 +19,31 @@ We provide four pre-calculated embedding datasets using different embedding algo
 | Cohere | 768 | 100,000 | 10,000 | Cosine |
 
 
+You can download datasets on our [huggingface repository](https://huggingface.co/datasets/korea-dbs/MoVeBench/tree/main).
+
+To download all datasets, run:
+
+```bash
+pip install huggingface-hub     #if needed
+hf download korea-dbs/MoVeBench --repo-type dataset --local-dir ./dataset
+```
+Or you can download a specific dataset (e.g. SIFT)
+```bash
+hf download korea-dbs/MoVeBench '*_sift.*' --repo-type dataset --local-dir ./dataset
+```
+Note that the benchmark requires all three files : `insert100k_{dataset_name}.sql` , `query10k_{dataset_name}.sql` and `groundtruth_{dataset_name}.txt`.
+
 ## How To Run
 
 Once you clone this repository, do
 
-```
+```bash
 make -j
 ```
 
 You can also build each engines with the code below.
 
-```
+```bash
 make libsql     # libSQL
 make lsmove     # LSMoVe
 make compact    # additional compaction code for LSMoVe
@@ -37,7 +51,7 @@ make compact    # additional compaction code for LSMoVe
 
 ### Run
 
-```
+```bash
 python3 benchmark.py
 ```
 
@@ -47,7 +61,6 @@ We provided benchmark with some useful options.
 | --- | --- | --- |
 | `dataset-dir` | Directory with SQL files | `./Dataset` |
 | `datasets` | Dataset names separated by `,` | `sift,glove,coco,cohere` |
-| `k` | k in top-k search | 10 |
 | `sqlite4-dir` | Directory containing the LSMoVe/sqlite4 shell and optional `compact_db` | `./LSMoVe` |
 | `sqlite3-dir` | Directory containing sqlite3 | `./LibSQL` |
 | `db-dir` | Directory to store db | `.` |
@@ -66,13 +79,13 @@ We provided benchmark with some useful options.
 ### example
 
 1. _Run the benchmark on SIFT dataset, with 4KB SQLite page size, 128MB LSM autoflush threshold, drop OS cache before each phase starts, do additional compaction between insert and search phase and keep DB file after each run._
-    ```
+    ```bash
     python benchmark.py --datasets sift --page-sizes 4 --lsm-autoflush 128 --lsm-use-compaction 1 --drop-cache --keep-db
     ```
 
 2. _Run the benchmark on SIFT, GloVe, COCO and Cohere dataset, with 4, 16, 32, 64 KB SQLite page size, 256MB LSM autoflush & 4 LSM automerge threshold, drop OS cache before each phase starts and delete DB file after each run._
 
-    ```
+    ```bash
     python benchmark.py
     ```
 
@@ -98,5 +111,5 @@ The following table shows the adjustable LSM configurations of SQLite4.
 | LSM_CONFIG_SET_COMPRESSION_FACTORY | Register a compression algorithms using `compression_id` | `LSM_COMPRESSION_NONE` |
 | LSM_CONFIG_GET_COMPRESSION | Get info of current compression algorithms | `LSM_COMPRESSION_NONE` |
 
-
+### 
 ## Results 
