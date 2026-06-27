@@ -1,6 +1,6 @@
 # MoVeBench : A Mobile Vector Benchmark
 
-**MoVeBench** is a DiskANN benchmark tool for mobile and other on-device environments, with a focus on the storage layer.
+**MoVeBench** is a DiskANN benchmark tool for mobile and on-device environments, with a focus on the storage layer evaluation.
 
 Although several approximate nearest neighbor(ANN) benchmark tools have been released, few provide performance metrics that isolate the impact of different storage layers.
 By varying only the storage layer, MoVeBench enables a direct evaluation of the trade-offs between two widely used storage structures, B-Tree and LSM-Tree, in your on-device environment.
