@@ -1,6 +1,6 @@
 # MoVeBench : A Mobile Vector Benchmark
 
-**MoVeBench** is a DiskANN benchmark tool for on-device environments, focusing on the storage layer.
+**MoVeBench** is a DiskANN benchmark tool for mobile and other on-device environments, with a focus on the storage layer.
 
 Although several approximate nearest neighbor(ANN) benchmark tools have been released, few provide performance metrics that isolate the impact of different storage layers.
 By varying only the storage layer, MoVeBench enables a direct evaluation of the trade-offs between two widely used storage structures, B-Tree and LSM-Tree, in your on-device environment.
@@ -62,7 +62,7 @@ We provided benchmark with some useful options.
 | `dataset-dir` | Directory with SQL files | `./Dataset` |
 | `datasets` | Dataset names separated by `,` | `sift,glove,coco,cohere` |
 | `sqlite4-dir` | Directory containing the LSMoVe/sqlite4 shell and optional `compact_db` | `./LSMoVe` |
-| `sqlite3-dir` | Directory containing sqlite3 | `./LibSQL` |
+| `sqlite3-dir` | Directory containing sqlite3 | `./libSQL` |
 | `db-dir` | Directory to store db | `.` |
 | `page_sizes` | Setting SQLite's page size(`LSM_CONFIG_PAGE_SIZE`) (KB) | `4,16,32,64` |
 | `lsm-compression` | LSM storage page compression algorithms | `zlib` , `lz4` , `none` (default) |
