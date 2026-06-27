@@ -45,22 +45,10 @@ Contacts:
    http://www.sqlite.org/
 
 ## [DBS]
-sqlite4 컴파일 방법
+How to build sqlite4
 ```
 make -f Makefile.linux-gcc
 ```
-(커맨드 마지막에 -B 옵션 추가해서 컴파일 덮어쓰기 가능)
+(Add -B option at the end of the command to force recompilation)
 
-마지막에 shell.c 없어서 컴파일 멈추지만 다른 파일은 모두 정상적으로 컴파일 된 상태이니 사용 가능.
-
-
-테스트 코드(test_bench.c) 컴파일 방법
-```
-gcc -g -O0 test_bench.c -I. -L. -lsqlite4 -pthread -lm -o test_bench
-```
-(test_blob.c , test_libsql.c test_vanilla.c 도 동일)
-
-* shell.c 컴파일 추가 확인 이후
-```
-./sqlite4 {db 이름} < load.sql(read.sql)
-```
+The build stops at the end due to missing shell.c, but all other files are compiled successfully and can be used.
