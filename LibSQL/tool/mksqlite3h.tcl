@@ -60,7 +60,7 @@ set nVersion [eval format "%d%03d%03d" [split $zVersion .]]
 
 # Get libSQL version number accordingly
 set in [open $TOP/LIBSQL_VERSION]
-set zLibSQLVersion [string trim [read $in]]
+set zlibSQLVersion [string trim [read $in]]
 close $in
 
 # Get the source-id
@@ -142,7 +142,7 @@ foreach file $filelist {
     regsub -- --VERSION-NUMBER-- $line $nVersion line
     regsub -- --SOURCE-ID--      $line "$zSourceId" line
 
-    regsub -- --LIBSQL-VERS--    $line $zLibSQLVersion line
+    regsub -- --LIBSQL-VERS--    $line $zlibSQLVersion line
 
     if {[regexp $varpattern $line] && ![regexp {^ *typedef} $line]} {
       set line "SQLITE_API $line"

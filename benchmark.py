@@ -883,7 +883,7 @@ def main():
                         help="Comma-separated dataset names (default: sift,glove,coco,cohere)")
     parser.add_argument("--sqlite4-dir", type=str, default="./LSMoVe",
                         help="Directory containing the LSMoVe/sqlite4 shell and optional compact_db")
-    parser.add_argument("--sqlite3-dir", type=str, default="./LibSQL",
+    parser.add_argument("--sqlite3-dir", type=str, default="./libSQL",
                         help="Directory containing sqlite3")
     parser.add_argument("--db-dir", type=str, default=".")
     parser.add_argument("--page-sizes", type=str, default="4,16,32,64")

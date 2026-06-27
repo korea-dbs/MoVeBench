@@ -136,7 +136,7 @@ double vectorF64DistanceL2(const Vector *, const Vector *);
 
 /* 
  * Serializes vector to the sqlite_blob in little-endian format according to the IEEE-754 standard
- * LibSQL can append one trailing byte in the end of final blob. This byte will be later used to determine type of the blob
+ * libSQL can append one trailing byte in the end of final blob. This byte will be later used to determine type of the blob
  * By default, blob with even length will be treated as a f32 blob
 */
 void vectorSerializeWithMeta(sqlite3_context *, const Vector *);
