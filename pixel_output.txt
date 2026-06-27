@@ -1,0 +1,542 @@
+Device:          adb serial=2B261FDH200B0M
+Disk device:     sda
+Datasets:        sift, glove, coco, cohere
+Configs:         lsm_4kb, sqlite3_4kb
+LSM compression: none
+LSM autoflush:   256 MB
+Compaction:      OFF
+DB dir:          /data/local/tmp (on device)
+I/O log dir:     ./io_logs (on host)
+Total runs:      8
+
+######################################################################
+  DATASET: sift
+######################################################################
+  Loaded 10000 groundtruth queries
+
+============================================================
+  Config: sift_lsm_4kb
+  Shell:  /data/local/sqlite4_lsm/MoVeBench/sqlite4
+  DB:     file:/data/local/tmp/bench_sift_lsm_4kb.db?page_size=4096
+============================================================
+  [1/3] Schema + Insert...
+        184.8s, 1253.0 MB
+        time: real=179.43s  user=154.62s  sys=10.40s
+        Stmt=175.9s  Commit=24.2s  Checkpt=0.0s  VecBuild=148.0s  Shadow=2.0s  GraphBuild=144.5s  BuildTrav=69.1s  EdgeUpd=75.4s  ReadPath=26.0s  WritePath=6.4s  Dist=58.2s  LSMComp=23.2s  PgComp=0.0s  PgDecomp=0.0s
+        StepApi=176.4s  StepCore=176.4s  StepExec=176.3s  StepReady=0.0s  StepAutoReset=0.0s  StepReset=0.0s  StepReprep=0.0s
+        StepMutex=0.0s/0.0s  StepProfile=0.0s  StepWal=0.0s  StepXfer=0.0s  StepApiExit=0.0s  StepOther=0.0s
+        disk=sda RBW=0.0MB/s WBW=29.5MB/s RIOPS=2 WIOPS=76 Latency=50.63ms Util=12.2%
+=== diskAnn insert breakdown (100000 inserts) ===
+  insert statement total:175892.4 ms  (100000 stmts)
+  VDBE work:           3518.4 ms
+  statement finish:   24227.1 ms
+  vector index build:  148008.3 ms  (100000 ops)
+    diskAnn core build:146461.5 ms
+    shadow row insert:   1955.1 ms
+    graph build/update:144506.4 ms
+      build graph traversal:69121.6 ms
+      build edge update:    75384.8 ms
+    build KV read path:25994.0 ms
+    build KV write path:6357.5 ms
+    build distance:58225.0 ms
+    LSM auto-compaction during insert: 23180.6 ms  (49015 calls, 13338432 pages)
+    LSM page compress:   0.0 ms  (0 calls, 0.0 -> 0.0 MB)
+    LSM page decompress: 0.0 ms  (0 calls, 0.0 -> 0.0 MB)
+    pass2 visited nodes: 7949636  (avg 79.50/insert)
+    existing edge updates: 1611650  (avg 16.12/insert, 20.3% of visited)
+    existing blob flushes: 1611650  5484.0 MB  (avg 16.12 flushes/insert)
+    new blob flushes: 100000  340.3 MB
+================================================
+  [2/3] Querying...
+        42.95s (233 q/s), 10000 queries returned
+        time: real=42.68s  user=32.36s  sys=2.94s
+        Graph=41376ms  ReadPath=18729ms  QueryDist=4832ms  Result=6ms  CtxDeinit=86ms
+        BlobOpen=0ms  BlobReopen=0ms  BlobRead=0ms  KVSeek=17682ms  KVData=117ms  KVDecode=106ms
+        disk=sda RBW=26.0MB/s WBW=0.0MB/s RIOPS=307 WIOPS=0 Latency=0.61ms Util=51.6%
+=== diskAnn search breakdown (10000 queries) ===
+  total:           41469.7 ms  (avg 4.147 ms/q, 241 q/s)
+  context init:       16.6 ms  (avg 0.002 ms/q,   0.0%)
+  graph traversal: 41375.8 ms  (avg 4.138 ms/q,  99.8%)
+    query KV read path:18728.9 ms  (avg 1.873 ms/q,  45.3% of graph)
+      KV cursor open:   4.0 ms
+      KV seek:       17682.2 ms
+      KV data:        116.7 ms
+      KV decode:      105.7 ms
+      KV memcpy:      300.2 ms
+    query distance:4832.2 ms  (avg 0.483 ms/q,  11.7% of graph)
+  result collect:      5.5 ms  (avg 0.001 ms/q,   0.0%)
+  context deinit:     86.0 ms  (avg 0.009 ms/q,   0.2%)
+  LSM page compress:        0.0 ms  (0 calls, 0.0 -> 0.0 MB)
+  LSM page decompress:      0.0 ms  (0 calls, 0.0 -> 0.0 MB)
+  vector search total:41771.4 ms
+    vector parse:      5.4 ms
+    index lookup/open:283.8 ms
+    diskAnn call:  41472.5 ms
+    vector cleanup:    6.7 ms
+================================================
+  [3/3] Computing recall@10...
+        recall@10 = 0.9868 (98.68%)
+  Cleaned up /data/local/tmp/bench_sift_lsm_4kb.db on device
+
+============================================================
+  Config: sift_sqlite3_4kb
+  Shell:  /data/local/sqlite3_libsql/MoVeBench/sqlite3
+============================================================
+  [1/3] Schema + Insert...
+        611.7s, 448.8 MB
+        time: real=606.48s  user=369.57s  sys=127.59s
+        Stmt=555.7s  Commit=182.5s  Checkpt=40.3s  VecBuild=364.8s  Shadow=16.4s  GraphBuild=340.2s  BuildTrav=210.4s  EdgeUpd=129.7s  ReadPath=3.8s  WritePath=3.3s  Dist=112.9s  LSMComp=0.0s  PgComp=0.0s  PgDecomp=0.0s
+        StepApi=596.9s  StepCore=596.8s  StepExec=556.3s  StepReady=0.0s  StepAutoReset=0.0s  StepReset=0.0s  StepReprep=0.0s
+        StepMutex=0.0s/0.0s  StepProfile=0.0s  StepWal=40.3s  StepXfer=0.0s  StepApiExit=0.0s  StepOther=0.1s
+        disk=sda RBW=0.0MB/s WBW=26.6MB/s RIOPS=0 WIOPS=2597 Latency=0.94ms Util=78.2%
+=== diskAnn insert breakdown (100000 inserts) ===
+  insert statement total:555748.8 ms  (100000 stmts)
+  VDBE work:           8109.4 ms
+  statement finish:  182524.3 ms
+  vector index build:  364802.4 ms  (100000 ops)
+    diskAnn core build:356588.3 ms
+    shadow row insert:  16426.9 ms
+    graph build/update:340161.4 ms
+      build graph traversal:210431.3 ms
+      build edge update:    129730.2 ms
+    build blob read path: 3777.9 ms
+    build blob write path:3330.8 ms
+    build distance:112916.9 ms
+    LSM work during build: 0.0 ms
+================================================
+  [2/3] Querying...
+        83.31s (120 q/s), 10000 queries returned
+        time: real=83.08s  user=37.08s  sys=21.68s
+        Graph=80348ms  ReadPath=43036ms  QueryDist=5948ms  Result=5ms  CtxDeinit=164ms
+        BlobOpen=0ms  BlobReopen=42126ms  BlobRead=522ms  KVSeek=0ms  KVData=0ms  KVDecode=0ms
+        disk=sda RBW=5.5MB/s WBW=0.0MB/s RIOPS=1356 WIOPS=0 Latency=0.30ms Util=70.5%
+=== diskAnn search breakdown (10000 queries) ===
+  total:           80520.7 ms  (avg 8.052 ms/q, 124 q/s)
+  context init:       33.5 ms  (avg 0.003 ms/q,   0.0%)
+  graph traversal: 80348.4 ms  (avg 8.035 ms/q,  99.8%)
+    query blob read path:43036.1 ms  (avg 4.304 ms/q,  53.6% of graph)
+      blob open:        0.0 ms
+      blob reopen:  42126.2 ms
+      blob read:      522.1 ms  (cache hit/miss 1109513/3082184)
+    query distance:5948.5 ms  (avg 0.595 ms/q,   7.4% of graph)
+  result collect:      5.1 ms  (avg 0.001 ms/q,   0.0%)
+  context deinit:    164.2 ms  (avg 0.016 ms/q,   0.2%)
+  vector search total:80807.1 ms
+    vector parse:     13.3 ms
+    index lookup/open:255.9 ms
+    diskAnn call:  80528.1 ms
+    vector cleanup:    5.1 ms
+================================================
+  [3/3] Computing recall@10...
+        recall@10 = 0.9871 (98.71%)
+  Cleaned up /data/local/tmp/bench_sift_sqlite3_4kb.db on device
+
+######################################################################
+  DATASET: glove
+######################################################################
+  Loaded 10000 groundtruth queries
+
+============================================================
+  Config: glove_lsm_4kb
+  Shell:  /data/local/sqlite4_lsm/MoVeBench/sqlite4
+  DB:     file:/data/local/tmp/bench_glove_lsm_4kb.db?page_size=4096
+============================================================
+  [1/3] Schema + Insert...
+        212.6s, 1559.0 MB
+        time: real=195.56s  user=165.73s  sys=12.56s
+        Stmt=189.6s  Commit=28.9s  Checkpt=0.0s  VecBuild=147.0s  Shadow=2.4s  GraphBuild=143.1s  BuildTrav=73.4s  EdgeUpd=69.7s  ReadPath=30.1s  WritePath=6.7s  Dist=47.0s  LSMComp=27.7s  PgComp=0.0s  PgDecomp=0.0s
+        StepApi=191.2s  StepCore=191.1s  StepExec=191.1s  StepReady=0.0s  StepAutoReset=0.0s  StepReset=0.0s  StepReprep=0.0s
+        StepMutex=0.0s/0.0s  StepProfile=0.0s  StepWal=0.0s  StepXfer=0.0s  StepApiExit=0.0s  StepOther=0.0s
+        disk=sda RBW=0.0MB/s WBW=36.3MB/s RIOPS=1 WIOPS=104 Latency=47.75ms Util=15.5%
+=== diskAnn insert breakdown (100000 inserts) ===
+  insert statement total:189613.2 ms  (100000 stmts)
+  VDBE work:          13485.2 ms
+  statement finish:   28942.3 ms
+  vector index build:  147046.0 ms  (100000 ops)
+    diskAnn core build:145463.3 ms
+    shadow row insert:   2387.5 ms
+    graph build/update:143075.8 ms
+      build graph traversal:73350.4 ms
+      build edge update:    69725.4 ms
+    build KV read path:30128.0 ms
+    build KV write path:6693.7 ms
+    build distance:47023.4 ms
+    LSM auto-compaction during insert: 27724.5 ms  (47950 calls, 13133952 pages)
+    LSM page compress:   0.0 ms  (0 calls, 0.0 -> 0.0 MB)
+    LSM page decompress: 0.0 ms  (0 calls, 0.0 -> 0.0 MB)
+    pass2 visited nodes: 7833626  (avg 78.34/insert)
+    existing edge updates: 998411  (avg 9.98/insert, 12.7% of visited)
+    existing blob flushes: 998411  5042.6 MB  (avg 9.98 flushes/insert)
+    new blob flushes: 100000  505.1 MB
+================================================
+  [2/3] Querying...
+        47.82s (209 q/s), 10000 queries returned
+        time: real=47.45s  user=36.66s  sys=3.00s
+        Graph=44626ms  ReadPath=21575ms  QueryDist=4732ms  Result=6ms  CtxDeinit=85ms
+        BlobOpen=0ms  BlobReopen=0ms  BlobRead=0ms  KVSeek=20440ms  KVData=113ms  KVDecode=106ms
+        disk=sda RBW=26.9MB/s WBW=0.0MB/s RIOPS=317 WIOPS=0 Latency=0.58ms Util=54.6%
+=== diskAnn search breakdown (10000 queries) ===
+  total:           44720.1 ms  (avg 4.472 ms/q, 224 q/s)
+  context init:       21.1 ms  (avg 0.002 ms/q,   0.0%)
+  graph traversal: 44626.4 ms  (avg 4.463 ms/q,  99.8%)
+    query KV read path:21575.3 ms  (avg 2.158 ms/q,  48.3% of graph)
+      KV cursor open:   4.1 ms
+      KV seek:       20439.8 ms
+      KV data:        113.4 ms
+      KV decode:      106.3 ms
+      KV memcpy:      397.6 ms
+    query distance:4732.3 ms  (avg 0.473 ms/q,  10.6% of graph)
+  result collect:      6.4 ms  (avg 0.001 ms/q,   0.0%)
+  context deinit:     85.0 ms  (avg 0.009 ms/q,   0.2%)
+  LSM page compress:        0.0 ms  (0 calls, 0.0 -> 0.0 MB)
+  LSM page decompress:      0.0 ms  (0 calls, 0.0 -> 0.0 MB)
+  vector search total:45094.6 ms
+    vector parse:     10.2 ms
+    index lookup/open:351.4 ms
+    diskAnn call:  44723.2 ms
+    vector cleanup:    6.8 ms
+================================================
+  [3/3] Computing recall@10...
+        recall@10 = 0.7112 (71.12%)
+  Cleaned up /data/local/tmp/bench_glove_lsm_4kb.db on device
+
+============================================================
+  Config: glove_sqlite3_4kb
+  Shell:  /data/local/sqlite3_libsql/MoVeBench/sqlite3
+============================================================
+  [1/3] Schema + Insert...
+        653.7s, 600.7 MB
+        time: real=636.89s  user=365.49s  sys=157.33s
+        Stmt=572.6s  Commit=185.4s  Checkpt=48.6s  VecBuild=369.5s  Shadow=17.4s  GraphBuild=343.3s  BuildTrav=227.7s  EdgeUpd=115.6s  ReadPath=29.6s  WritePath=5.1s  Dist=87.1s  LSMComp=0.0s  PgComp=0.0s  PgDecomp=0.0s
+        StepApi=622.8s  StepCore=622.7s  StepExec=573.9s  StepReady=0.0s  StepAutoReset=0.0s  StepReset=0.0s  StepReprep=0.0s
+        StepMutex=0.0s/0.0s  StepProfile=0.0s  StepWal=48.6s  StepXfer=0.0s  StepApiExit=0.0s  StepOther=0.1s
+        disk=sda RBW=0.0MB/s WBW=30.8MB/s RIOPS=0 WIOPS=2357 Latency=1.26ms Util=76.7%
+=== diskAnn insert breakdown (100000 inserts) ===
+  insert statement total:572625.8 ms  (100000 stmts)
+  VDBE work:          17471.3 ms
+  statement finish:  185371.2 ms
+  vector index build:  369495.6 ms  (100000 ops)
+    diskAnn core build:360684.7 ms
+    shadow row insert:  17384.1 ms
+    graph build/update:343300.6 ms
+      build graph traversal:227718.8 ms
+      build edge update:    115581.7 ms
+    build blob read path:29591.5 ms
+    build blob write path:5076.8 ms
+    build distance:87083.0 ms
+    LSM work during build: 0.0 ms
+================================================
+  [2/3] Querying...
+        84.04s (119 q/s), 10000 queries returned
+        time: real=83.66s  user=36.92s  sys=24.42s
+        Graph=80229ms  ReadPath=44123ms  QueryDist=5403ms  Result=6ms  CtxDeinit=162ms
+        BlobOpen=0ms  BlobReopen=20949ms  BlobRead=22814ms  KVSeek=0ms  KVData=0ms  KVDecode=0ms
+        disk=sda RBW=7.5MB/s WBW=0.0MB/s RIOPS=1644 WIOPS=6 Latency=0.31ms Util=72.1%
+=== diskAnn search breakdown (10000 queries) ===
+  total:           80399.7 ms  (avg 8.040 ms/q, 124 q/s)
+  context init:       33.2 ms  (avg 0.003 ms/q,   0.0%)
+  graph traversal: 80229.2 ms  (avg 8.023 ms/q,  99.8%)
+    query blob read path:44122.7 ms  (avg 4.412 ms/q,  55.0% of graph)
+      blob open:        0.0 ms
+      blob reopen:  20949.2 ms
+      blob read:    22814.1 ms  (cache hit/miss 1631512/2528090)
+    query distance:5402.9 ms  (avg 0.540 ms/q,   6.7% of graph)
+  result collect:      6.0 ms  (avg 0.001 ms/q,   0.0%)
+  context deinit:    162.3 ms  (avg 0.016 ms/q,   0.2%)
+  vector search total:80668.9 ms
+    vector parse:     12.5 ms
+    index lookup/open:242.3 ms
+    diskAnn call:  80405.3 ms
+    vector cleanup:    4.8 ms
+================================================
+  [3/3] Computing recall@10...
+        recall@10 = 0.7104 (71.04%)
+  Cleaned up /data/local/tmp/bench_glove_sqlite3_4kb.db on device
+
+######################################################################
+  DATASET: coco
+######################################################################
+  Loaded 10000 groundtruth queries
+
+============================================================
+  Config: coco_lsm_4kb
+  Shell:  /data/local/sqlite4_lsm/MoVeBench/sqlite4
+  DB:     file:/data/local/tmp/bench_coco_lsm_4kb.db?page_size=4096
+============================================================
+  [1/3] Schema + Insert...
+        593.6s, 8092.0 MB
+        time: real=563.30s  user=315.29s  sys=97.38s
+        Stmt=553.3s  Commit=267.9s  Checkpt=0.0s  VecBuild=274.1s  Shadow=3.6s  GraphBuild=268.5s  BuildTrav=131.9s  EdgeUpd=136.6s  ReadPath=74.8s  WritePath=28.3s  Dist=72.6s  LSMComp=266.8s  PgComp=0.0s  PgDecomp=0.0s
+        StepApi=556.3s  StepCore=556.2s  StepExec=556.2s  StepReady=0.0s  StepAutoReset=0.0s  StepReset=0.0s  StepReprep=0.0s
+        StepMutex=0.0s/0.0s  StepProfile=0.0s  StepWal=0.0s  StepXfer=0.0s  StepApiExit=0.0s  StepOther=0.0s
+        disk=sda RBW=11.4MB/s WBW=77.4MB/s RIOPS=209 WIOPS=233 Latency=23.17ms Util=46.1%
+=== diskAnn insert breakdown (100000 inserts) ===
+  insert statement total:553285.5 ms  (100000 stmts)
+  VDBE work:          11174.6 ms
+  statement finish:  267872.6 ms
+  vector index build:  274057.0 ms  (100000 ops)
+    diskAnn core build:272090.3 ms
+    shadow row insert:   3635.1 ms
+    graph build/update:268455.2 ms
+      build graph traversal:131864.6 ms
+      build edge update:    136590.6 ms
+    build KV read path:74781.4 ms
+    build KV write path:28315.8 ms
+    build distance:72554.9 ms
+    LSM auto-compaction during insert: 266804.6 ms  (203100 calls, 77242656 pages)
+    LSM page compress:   0.0 ms  (0 calls, 0.0 -> 0.0 MB)
+    LSM page decompress: 0.0 ms  (0 calls, 0.0 -> 0.0 MB)
+    pass2 visited nodes: 7785716  (avg 77.86/insert)
+    existing edge updates: 1870633  (avg 18.71/insert, 24.0% of visited)
+    existing blob flushes: 1870633  22806.3 MB  (avg 18.71 flushes/insert)
+    new blob flushes: 100000  1219.2 MB
+================================================
+  [2/3] Querying...
+        71.16s (141 q/s), 10000 queries returned
+        time: real=70.59s  user=52.82s  sys=5.30s
+        Graph=67222ms  ReadPath=40867ms  QueryDist=7079ms  Result=12ms  CtxDeinit=87ms
+        BlobOpen=0ms  BlobReopen=0ms  BlobRead=0ms  KVSeek=39257ms  KVData=121ms  KVDecode=110ms
+        disk=sda RBW=30.2MB/s WBW=0.0MB/s RIOPS=358 WIOPS=7 Latency=0.55ms Util=57.3%
+=== diskAnn search breakdown (10000 queries) ===
+  total:           67324.8 ms  (avg 6.732 ms/q, 149 q/s)
+  context init:       41.6 ms  (avg 0.004 ms/q,   0.1%)
+  graph traversal: 67221.7 ms  (avg 6.722 ms/q,  99.8%)
+    query KV read path:40867.4 ms  (avg 4.087 ms/q,  60.8% of graph)
+      KV cursor open:   5.3 ms
+      KV seek:       39256.7 ms
+      KV data:        121.1 ms
+      KV decode:      110.5 ms
+      KV memcpy:      858.7 ms
+    query distance:7079.4 ms  (avg 0.708 ms/q,  10.5% of graph)
+  result collect:     11.9 ms  (avg 0.001 ms/q,   0.0%)
+  context deinit:     87.3 ms  (avg 0.009 ms/q,   0.1%)
+  LSM page compress:        0.0 ms  (0 calls, 0.0 -> 0.0 MB)
+  LSM page decompress:      0.0 ms  (0 calls, 0.0 -> 0.0 MB)
+  vector search total:67952.3 ms
+    vector parse:     13.3 ms
+    index lookup/open:592.2 ms
+    diskAnn call:  67331.8 ms
+    vector cleanup:   11.8 ms
+================================================
+  [3/3] Computing recall@10...
+        recall@10 = 0.9502 (95.02%)
+  Cleaned up /data/local/tmp/bench_coco_lsm_4kb.db on device
+
+============================================================
+  Config: coco_sqlite3_4kb
+  Shell:  /data/local/sqlite3_libsql/MoVeBench/sqlite3
+============================================================
+  [1/3] Schema + Insert...
+        959.1s, 1620.7 MB
+        time: real=929.71s  user=428.03s  sys=292.88s
+        Stmt=739.1s  Commit=247.1s  Checkpt=172.6s  VecBuild=471.1s  Shadow=18.4s  GraphBuild=444.4s  BuildTrav=271.1s  EdgeUpd=173.3s  ReadPath=67.8s  WritePath=15.4s  Dist=113.5s  LSMComp=0.0s  PgComp=0.0s  PgDecomp=0.0s
+        StepApi=913.6s  StepCore=913.6s  StepExec=740.8s  StepReady=0.0s  StepAutoReset=0.0s  StepReset=0.0s  StepReprep=0.0s
+        StepMutex=0.0s/0.0s  StepProfile=0.0s  StepWal=172.6s  StepXfer=0.0s  StepApiExit=0.0s  StepOther=0.1s
+        disk=sda RBW=0.0MB/s WBW=71.4MB/s RIOPS=2 WIOPS=3851 Latency=1.97ms Util=74.7%
+=== diskAnn insert breakdown (100000 inserts) ===
+  insert statement total:739064.2 ms  (100000 stmts)
+  VDBE work:          20620.2 ms
+  statement finish:  247097.1 ms
+  vector index build:  471077.0 ms  (100000 ops)
+    diskAnn core build:462864.9 ms
+    shadow row insert:  18415.6 ms
+    graph build/update:444449.3 ms
+      build graph traversal:271101.5 ms
+      build edge update:    173347.7 ms
+    build blob read path:67755.1 ms
+    build blob write path:15376.8 ms
+    build distance:113512.5 ms
+    LSM work during build: 0.0 ms
+================================================
+  [2/3] Querying...
+        80.21s (125 q/s), 10000 queries returned
+        time: real=79.67s  user=34.05s  sys=28.00s
+        Graph=76060ms  ReadPath=42997ms  QueryDist=7321ms  Result=5ms  CtxDeinit=140ms
+        BlobOpen=0ms  BlobReopen=11850ms  BlobRead=30816ms  KVSeek=0ms  KVData=0ms  KVDecode=0ms
+        disk=sda RBW=21.2MB/s WBW=0.0MB/s RIOPS=3200 WIOPS=6 Latency=0.25ms Util=58.0%
+=== diskAnn search breakdown (10000 queries) ===
+  total:           76207.4 ms  (avg 7.621 ms/q, 131 q/s)
+  context init:       41.0 ms  (avg 0.004 ms/q,   0.1%)
+  graph traversal: 76059.9 ms  (avg 7.606 ms/q,  99.8%)
+    query blob read path:42996.8 ms  (avg 4.300 ms/q,  56.5% of graph)
+      blob open:        0.0 ms
+      blob reopen:  11850.4 ms
+      blob read:    30815.6 ms  (cache hit/miss 2070630/2111954)
+    query distance:7321.4 ms  (avg 0.732 ms/q,   9.6% of graph)
+  result collect:      5.1 ms  (avg 0.001 ms/q,   0.0%)
+  context deinit:    140.0 ms  (avg 0.014 ms/q,   0.2%)
+  vector search total:76435.8 ms
+    vector parse:     13.9 ms
+    index lookup/open:201.6 ms
+    diskAnn call:  76211.7 ms
+    vector cleanup:    3.7 ms
+================================================
+  [3/3] Computing recall@10...
+        recall@10 = 0.9498 (94.98%)
+  Cleaned up /data/local/tmp/bench_coco_sqlite3_4kb.db on device
+
+######################################################################
+  DATASET: cohere
+######################################################################
+  Loaded 10000 groundtruth queries
+
+============================================================
+  Config: cohere_lsm_4kb
+  Shell:  /data/local/sqlite4_lsm/MoVeBench/sqlite4
+  DB:     file:/data/local/tmp/bench_cohere_lsm_4kb.db?page_size=4096
+============================================================
+  [1/3] Schema + Insert...
+        733.0s, 6967.0 MB
+        time: real=678.95s  user=425.63s  sys=95.61s
+        Stmt=660.1s  Commit=242.7s  Checkpt=0.0s  VecBuild=367.9s  Shadow=5.4s  GraphBuild=360.4s  BuildTrav=177.9s  EdgeUpd=182.5s  ReadPath=95.3s  WritePath=38.1s  Dist=100.3s  LSMComp=241.0s  PgComp=0.0s  PgDecomp=0.0s
+        StepApi=665.8s  StepCore=665.8s  StepExec=665.7s  StepReady=0.0s  StepAutoReset=0.0s  StepReset=0.0s  StepReprep=0.0s
+        StepMutex=0.0s/0.0s  StepProfile=0.0s  StepWal=0.0s  StepXfer=0.0s  StepApiExit=0.0s  StepOther=0.0s
+        disk=sda RBW=10.8MB/s WBW=62.9MB/s RIOPS=190 WIOPS=189 Latency=22.79ms Util=47.4%
+=== diskAnn insert breakdown (100000 inserts) ===
+  insert statement total:660058.7 ms  (100000 stmts)
+  VDBE work:          49238.4 ms
+  statement finish:  242698.4 ms
+  vector index build:  367932.7 ms  (100000 ops)
+    diskAnn core build:365756.9 ms
+    shadow row insert:   5352.5 ms
+    graph build/update:360404.4 ms
+      build graph traversal:177861.8 ms
+      build edge update:    182542.5 ms
+    build KV read path:95265.0 ms
+    build KV write path:38088.9 ms
+    build distance:100313.1 ms
+    LSM auto-compaction during insert: 240950.4 ms  (182110 calls, 66469056 pages)
+    LSM page compress:   0.0 ms  (0 calls, 0.0 -> 0.0 MB)
+    LSM page decompress: 0.0 ms  (0 calls, 0.0 -> 0.0 MB)
+    pass2 visited nodes: 7470934  (avg 74.71/insert)
+    existing edge updates: 1051616  (avg 10.52/insert, 14.1% of visited)
+    existing blob flushes: 1051616  18982.9 MB  (avg 10.52 flushes/insert)
+    new blob flushes: 100000  1805.1 MB
+================================================
+  [2/3] Querying...
+        104.19s (96 q/s), 10000 queries returned
+        time: real=103.27s  user=71.36s  sys=8.77s
+        Graph=94550ms  ReadPath=52835ms  QueryDist=12709ms  Result=15ms  CtxDeinit=99ms
+        BlobOpen=0ms  BlobReopen=0ms  BlobRead=0ms  KVSeek=50379ms  KVData=143ms  KVDecode=130ms
+        disk=sda RBW=40.3MB/s WBW=0.0MB/s RIOPS=451 WIOPS=5 Latency=0.56ms Util=73.1%
+=== diskAnn search breakdown (10000 queries) ===
+  total:           94668.0 ms  (avg 9.467 ms/q, 106 q/s)
+  context init:      106.5 ms  (avg 0.011 ms/q,   0.1%)
+  graph traversal: 94550.2 ms  (avg 9.455 ms/q,  99.9%)
+    query KV read path:52834.7 ms  (avg 5.283 ms/q,  55.9% of graph)
+      KV cursor open:  11.2 ms
+      KV seek:       50378.7 ms
+      KV data:        142.6 ms
+      KV decode:      130.1 ms
+      KV memcpy:     1584.9 ms
+    query distance:12708.8 ms  (avg 1.271 ms/q,  13.4% of graph)
+  result collect:     15.0 ms  (avg 0.002 ms/q,   0.0%)
+  context deinit:     98.6 ms  (avg 0.010 ms/q,   0.1%)
+  LSM page compress:        0.0 ms  (0 calls, 0.0 -> 0.0 MB)
+  LSM page decompress:      0.0 ms  (0 calls, 0.0 -> 0.0 MB)
+  vector search total:95570.8 ms
+    vector parse:     15.6 ms
+    index lookup/open:864.1 ms
+    diskAnn call:  94673.7 ms
+    vector cleanup:   12.9 ms
+================================================
+  [3/3] Computing recall@10...
+        recall@10 = 0.9169 (91.69%)
+  Cleaned up /data/local/tmp/bench_cohere_lsm_4kb.db on device
+
+============================================================
+  Config: cohere_sqlite3_4kb
+  Shell:  /data/local/sqlite3_libsql/MoVeBench/sqlite3
+============================================================
+  [1/3] Schema + Insert...
+        1084.2s, 2346.9 MB
+        time: real=1028.75s  user=528.26s  sys=286.11s
+        Stmt=871.7s  Commit=260.9s  Checkpt=130.7s  VecBuild=572.0s  Shadow=20.9s  GraphBuild=543.0s  BuildTrav=340.3s  EdgeUpd=202.7s  ReadPath=79.0s  WritePath=10.9s  Dist=152.4s  LSMComp=0.0s  PgComp=0.0s  PgDecomp=0.0s
+        StepApi=1005.8s  StepCore=1005.7s  StepExec=874.8s  StepReady=0.0s  StepAutoReset=0.0s  StepReset=0.0s  StepReprep=0.0s
+        StepMutex=0.0s/0.0s  StepProfile=0.0s  StepWal=130.7s  StepXfer=0.0s  StepApiExit=0.0s  StepOther=0.1s
+        disk=sda RBW=0.0MB/s WBW=48.4MB/s RIOPS=2 WIOPS=1225 Latency=3.71ms Util=65.5%
+=== diskAnn insert breakdown (100000 inserts) ===
+  insert statement total:871655.4 ms  (100000 stmts)
+  VDBE work:          38413.5 ms
+  statement finish:  260912.4 ms
+  vector index build:  572019.3 ms  (100000 ops)
+    diskAnn core build:563915.7 ms
+    shadow row insert:  20908.1 ms
+    graph build/update:543007.6 ms
+      build graph traversal:340259.6 ms
+      build edge update:    202748.0 ms
+    build blob read path:79011.2 ms
+    build blob write path:10858.3 ms
+    build distance:152444.7 ms
+    LSM work during build: 0.0 ms
+================================================
+  [2/3] Querying...
+        166.41s (60 q/s), 10000 queries returned
+        time: real=165.46s  user=61.11s  sys=56.25s
+        Graph=157499ms  ReadPath=99259ms  QueryDist=15816ms  Result=11ms  CtxDeinit=215ms
+        BlobOpen=0ms  BlobReopen=43365ms  BlobRead=55457ms  KVSeek=0ms  KVData=0ms  KVDecode=0ms
+        disk=sda RBW=13.9MB/s WBW=0.0MB/s RIOPS=1655 WIOPS=3 Latency=0.29ms Util=75.7%
+=== diskAnn search breakdown (10000 queries) ===
+  total:          157728.1 ms  (avg 15.773 ms/q, 63 q/s)
+  context init:       73.3 ms  (avg 0.007 ms/q,   0.0%)
+  graph traversal:157499.2 ms  (avg 15.750 ms/q,  99.9%)
+    query blob read path:99259.0 ms  (avg 9.926 ms/q,  63.0% of graph)
+      blob open:        0.0 ms
+      blob reopen:  43364.8 ms
+      blob read:    55457.4 ms  (cache hit/miss 780274/3290195)
+    query distance:15816.4 ms  (avg 1.582 ms/q,  10.0% of graph)
+  result collect:     10.8 ms  (avg 0.001 ms/q,   0.0%)
+  context deinit:    214.8 ms  (avg 0.021 ms/q,   0.1%)
+  vector search total:158196.9 ms
+    vector parse:     26.5 ms
+    index lookup/open:417.0 ms
+    diskAnn call: 157737.7 ms
+    vector cleanup:    9.0 ms
+================================================
+  [3/3] Computing recall@10...
+        recall@10 = 0.9173 (91.73%)
+  Cleaned up /data/local/tmp/bench_cohere_sqlite3_4kb.db on device
+
+=============================================================================================================================================================================================================================================
+                                                                                                            SUMMARY: sift (k=10)                                                                                                             
+=============================================================================================================================================================================================================================================
+                 |                                                        --- Insert ---                                                          |                                  --- Query ---                                   |
+          Config | Overall     Stmt   Commit  Checkpt VecBuild   Shadow     Trav  EdgeUpd ReadPath WritePath     Dist  LSMComp   PgComp PgDecomp | Overall    Graph ReadPath     Dist   Result   PgComp PgDecomp      Q/s   Recall |     Size
+                 |     (s)      (s)      (s)      (s)      (s)      (s)      (s)      (s)      (s)       (s)      (s)      (s)      (s)      (s) |     (s)     (ms)     (ms)     (ms)     (ms)     (ms)     (ms)                @k |     (MB)
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+         lsm_4kb |   184.8    175.9     24.2      0.0    148.0      2.0     69.1     75.4     26.0       6.4     58.2     23.2      0.0      0.0 |    43.0  41375.8  18728.9   4832.2      5.5      0.0      0.0      233   0.9868 |   1253.0
+     sqlite3_4kb |   611.7    555.7    182.5     40.3    364.8     16.4    210.4    129.7      3.8       3.3    112.9      0.0      0.0      0.0 |    83.3  80348.4  43036.1   5948.5      5.1      0.0      0.0      120   0.9871 |    448.8
+=============================================================================================================================================================================================================================================
+
+=============================================================================================================================================================================================================================================
+                                                                                                            SUMMARY: glove (k=10)                                                                                                            
+=============================================================================================================================================================================================================================================
+                 |                                                        --- Insert ---                                                          |                                  --- Query ---                                   |
+          Config | Overall     Stmt   Commit  Checkpt VecBuild   Shadow     Trav  EdgeUpd ReadPath WritePath     Dist  LSMComp   PgComp PgDecomp | Overall    Graph ReadPath     Dist   Result   PgComp PgDecomp      Q/s   Recall |     Size
+                 |     (s)      (s)      (s)      (s)      (s)      (s)      (s)      (s)      (s)       (s)      (s)      (s)      (s)      (s) |     (s)     (ms)     (ms)     (ms)     (ms)     (ms)     (ms)                @k |     (MB)
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+         lsm_4kb |   212.7    189.6     28.9      0.0    147.0      2.4     73.4     69.7     30.1       6.7     47.0     27.7      0.0      0.0 |    47.8  44626.4  21575.3   4732.3      6.4      0.0      0.0      209   0.7112 |   1559.0
+     sqlite3_4kb |   653.7    572.6    185.4     48.6    369.5     17.4    227.7    115.6     29.6       5.1     87.1      0.0      0.0      0.0 |    84.0  80229.2  44122.7   5402.9      6.0      0.0      0.0      119   0.7104 |    600.7
+=============================================================================================================================================================================================================================================
+
+=============================================================================================================================================================================================================================================
+                                                                                                            SUMMARY: coco (k=10)                                                                                                             
+=============================================================================================================================================================================================================================================
+                 |                                                        --- Insert ---                                                          |                                  --- Query ---                                   |
+          Config | Overall     Stmt   Commit  Checkpt VecBuild   Shadow     Trav  EdgeUpd ReadPath WritePath     Dist  LSMComp   PgComp PgDecomp | Overall    Graph ReadPath     Dist   Result   PgComp PgDecomp      Q/s   Recall |     Size
+                 |     (s)      (s)      (s)      (s)      (s)      (s)      (s)      (s)      (s)       (s)      (s)      (s)      (s)      (s) |     (s)     (ms)     (ms)     (ms)     (ms)     (ms)     (ms)                @k |     (MB)
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+         lsm_4kb |   593.6    553.3    267.9      0.0    274.1      3.6    131.9    136.6     74.8      28.3     72.6    266.8      0.0      0.0 |    71.2  67221.7  40867.4   7079.4     11.9      0.0      0.0      140   0.9502 |   8092.0
+     sqlite3_4kb |   959.1    739.1    247.1    172.6    471.1     18.4    271.1    173.3     67.8      15.4    113.5      0.0      0.0      0.0 |    80.2  76059.9  42996.8   7321.4      5.1      0.0      0.0      125   0.9498 |   1620.7
+=============================================================================================================================================================================================================================================
+
+=============================================================================================================================================================================================================================================
+                                                                                                           SUMMARY: cohere (k=10)                                                                                                            
+=============================================================================================================================================================================================================================================
+                 |                                                        --- Insert ---                                                          |                                  --- Query ---                                   |
+          Config | Overall     Stmt   Commit  Checkpt VecBuild   Shadow     Trav  EdgeUpd ReadPath WritePath     Dist  LSMComp   PgComp PgDecomp | Overall    Graph ReadPath     Dist   Result   PgComp PgDecomp      Q/s   Recall |     Size
+                 |     (s)      (s)      (s)      (s)      (s)      (s)      (s)      (s)      (s)       (s)      (s)      (s)      (s)      (s) |     (s)     (ms)     (ms)     (ms)     (ms)     (ms)     (ms)                @k |     (MB)
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+         lsm_4kb |   733.0    660.1    242.7      0.0    367.9      5.4    177.9    182.5     95.3      38.1    100.3    241.0      0.0      0.0 |   104.2  94550.2  52834.7  12708.8     15.0      0.0      0.0       96   0.9169 |   6967.0
+     sqlite3_4kb |  1084.2    871.7    260.9    130.7    572.0     20.9    340.3    202.7     79.0      10.9    152.4      0.0      0.0      0.0 |   166.4 157499.2  99259.0  15816.4     10.8      0.0      0.0       60   0.9173 |   2346.9
+=============================================================================================================================================================================================================================================
