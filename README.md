@@ -10,7 +10,7 @@ MoVeBench uses LibSQL as the B-tree-based baseline built on SQLite3, and LSMoVe,
 
 ## Datasets
 
-We provide four pre-trained datasets based on each different embedding algorithms which can be used in MoVeBench; SIFT , GloVe , COCO and Cohere.
+We provide four pre-calculated embedding datasets using different embedding algorithms for this benchmark: SIFT, GloVe, COCO and Cohere.
 
 | Dataset | Dimensions | # of Insert | # of Search | Distance |
 |---|---:|---:|---:|---|
