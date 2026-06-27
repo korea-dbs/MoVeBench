@@ -749,7 +749,7 @@ def run_one_config(label, shell, compact_bin, insert_sql_path, query_sql_path,
         for block in extract_c_stat_blocks(ins_err):
             print(block)
 
-    # Compact (LSMobiVec only)
+    # Compact (LSMoVe only)
     if need_compact:
         print(f"  [2/{n_phases}] Compacting...")
         drop_caches()
@@ -880,18 +880,18 @@ def main():
     parser.add_argument("--datasets", type=str, default="sift,glove,coco,cohere",
                         help="Comma-separated dataset names (default: sift,glove,coco,cohere)")
     parser.add_argument("--k", type=int, default=10)
-    parser.add_argument("--lsm-dir", type=str, default="./LSMobiVec",
-                        help="Directory containing the LSMobiVec/sqlite4 shell and optional compact_db")
+    parser.add_argument("--lsm-dir", type=str, default="./LSMoVe",
+                        help="Directory containing the LSMoVe/sqlite4 shell and optional compact_db")
     parser.add_argument("--sqlite3-dir", type=str, default="./LibSQL",
                         help="Directory containing sqlite3")
     parser.add_argument("--db-dir", type=str, default=".")
     parser.add_argument("--page-sizes", type=str, default="4,16,32,64")
     parser.add_argument("--lsm-compression", type=str, default="none", choices=["none", "zlib", "lz4"],
-                        help="LSM storage page compression for LSMobiVec configs")
+                        help="LSM storage page compression for LSMoVe configs")
     parser.add_argument("--lsm-autoflush-mb", type=int, default=None,
-                        help="Set LSM autoflush threshold in MB for LSMobiVec configs")
+                        help="Set LSM autoflush threshold in MB for LSMoVe configs")
     parser.add_argument("--use-compaction", type=int, default=0, choices=[0, 1],
-                        help="1: use compact_db after insert for LSMobiVec configs, 0: skip compact_db")
+                        help="1: use compact_db after insert for LSMoVe configs, 0: skip compact_db")
     parser.add_argument("--drop-cache", action="store_true",
                         help="Drop OS page cache before each timed phase (requires sudo)")
     parser.add_argument("--disk-device", type=str, default="auto",
@@ -935,11 +935,11 @@ def main():
     if args.lsm_dir:
         shell = os.path.join(args.lsm_dir, "sqlite4")
         if not os.path.isfile(shell):
-            print("Warning: LSMobiVec sqlite4 shell missing, skipping LSMobiVec configs")
+            print("Warning: LSMoVe sqlite4 shell missing, skipping LSMoVe configs")
         else:
             compact_bin = build_compact_binary(args.lsm_dir) if use_compaction else None
             if use_compaction and compact_bin is None:
-                print("Warning: compact_db unavailable, skipping LSMobiVec configs")
+                print("Warning: compact_db unavailable, skipping LSMoVe configs")
             else:
                 for ps_kb in page_sizes_kb:
                     configs.append((f"lsm_{ps_kb}kb", shell, compact_bin, False, ps_kb))
