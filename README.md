@@ -3,7 +3,6 @@
 **MoVeBench** is a DiskANN benchmark tool for on-device environments.
 
 Although several approximate nearest neighbor(ANN) benchmark tools have been released, few provide performance metrics that isolate the impact of different storage layers.
-
 By varying only the storage layer, MoVeBench enables a direct evaluation of the trade-offs between two widely used storage structures, B-Tree and LSM-Tree, in your on-device environment.
 
 MoVeBench uses LibSQL as the B-tree-based baseline built on SQLite3, and LSMoVe, our port of LibSQL's DiskANN layer to SQLite4, to evaluate an LSM-tree-based storage layer.
@@ -79,7 +78,7 @@ We provided benchmark with some useful options.
 
 ### Other Configurations
 
-Here are some configurations you can adjust which SQLite4 provides. See the table below : 
+The following table shows the adjustable LSM configurations of SQLite4.
 
 | Configuration | Description | Default |
 | --- | --- | --- |
