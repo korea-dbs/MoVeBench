@@ -16,6 +16,18 @@
 ** calls.
 */
 #include "sqliteInt.h"
+#include <sys/time.h>
+
+extern double g_autoworkTotalMs;
+
+double g_kvCommitTotalMs = 0.0;
+double g_kvCommitLsmMs = 0.0;
+
+static double kvCommitNowMs(void){
+  struct timeval tv;
+  gettimeofday(&tv, 0);
+  return (double)tv.tv_sec*1000.0 + (double)tv.tv_usec/1000.0;
+}
 
 /*
 ** Names of error codes used for tracing.
@@ -288,8 +300,12 @@ int sqlite4KVStoreCommitPhaseTwo(KVStore *p, int iLevel){
 }
 int sqlite4KVStoreCommit(KVStore *p, int iLevel){
   int rc;
+  double t0 = kvCommitNowMs();
+  double lsm0 = g_autoworkTotalMs;
   rc = sqlite4KVStoreCommitPhaseOne(p, iLevel);
   if( rc==SQLITE4_OK ) rc = sqlite4KVStoreCommitPhaseTwo(p, iLevel);
+  g_kvCommitTotalMs += kvCommitNowMs() - t0;
+  g_kvCommitLsmMs += g_autoworkTotalMs - lsm0;
   return rc;
 }
 int sqlite4KVStoreRollback(KVStore *p, int iLevel){

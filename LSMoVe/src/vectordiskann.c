@@ -88,6 +88,8 @@ extern long long g_lsmCompressInBytes;
 extern long long g_lsmCompressOutBytes;
 extern long long g_lsmUncompressInBytes;
 extern long long g_lsmUncompressOutBytes;
+extern double g_kvCommitTotalMs;
+extern double g_kvCommitLsmMs;
 static int g_ioTimingEnabled = -1;
 
 static double diskAnnMsBetween(struct timespec *p0, struct timespec *p1){
@@ -2247,6 +2249,10 @@ static void diskAnnPrintInsertStats(void){
             g_totalInsertStmtMs, g_totalInsertStmtCount);
     fprintf(stderr, "  VDBE work:         %8.1f ms\n", g_totalInsertOtherMs);
     fprintf(stderr, "  statement finish:  %8.1f ms\n", g_totalInsertFinishMs);
+    fprintf(stderr, "  KV commit total:   %8.1f ms\n", g_kvCommitTotalMs);
+    fprintf(stderr, "  KV commit LSM work:%8.1f ms\n", g_kvCommitLsmMs);
+    fprintf(stderr, "  KV commit no LSM:  %8.1f ms\n",
+            g_kvCommitTotalMs - g_kvCommitLsmMs);
     fprintf(stderr, "  vector index build:  %8.1f ms  (%d ops)\n",
             indexBuildTotal, g_totalIndexBuildCount);
     fprintf(stderr, "    diskAnn core build:%8.1f ms\n", diskAnnCoreBuild);

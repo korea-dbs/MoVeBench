@@ -67,6 +67,7 @@ static int g_totalBlobCacheMisses;
 static double g_totalInsertStmtMs;
 static double g_totalInsertOtherMs;
 static double g_totalInsertFinishMs;
+extern double g_btreeCommitTotalMs;
 static int g_searchVisitedTotal;
 static long long g_searchEdgesTotal;
 
@@ -2103,6 +2104,7 @@ static void diskAnnPrintInsertStats(void){
             g_totalInsertStmtMs, g_totalInsertStmtCount);
     fprintf(stderr, "  VDBE work:         %8.1f ms\n", g_totalInsertOtherMs);
     fprintf(stderr, "  statement finish:  %8.1f ms\n", g_totalInsertFinishMs);
+    fprintf(stderr, "  Btree commit total:%8.1f ms\n", g_btreeCommitTotalMs);
     fprintf(stderr, "  vector index build:  %8.1f ms  (%d ops)\n",
             indexBuildTotal, g_totalIndexBuildCount);
     fprintf(stderr, "    diskAnn core build:%8.1f ms\n", diskAnnCoreBuild);

@@ -512,6 +512,10 @@ def parse_diskann_stats(stderr_text):
     grab(r'VDBE work:\s*([\d.]+)\s+ms', 'insert_vdbe_work_ms')
     grab(r'insert VDBE other:\s*([\d.]+)\s+ms', 'insert_vdbe_work_ms')
     grab(r'statement finish:\s*([\d.]+)\s+ms', 'insert_stmt_finish_ms')
+    grab(r'KV commit total:\s*([\d.]+)\s+ms', 'insert_kv_commit_total_ms')
+    grab(r'KV commit LSM work:\s*([\d.]+)\s+ms', 'insert_kv_commit_lsm_ms')
+    grab(r'KV commit no LSM:\s*([\d.]+)\s+ms', 'insert_kv_commit_no_lsm_ms')
+    grab(r'Btree commit total:\s*([\d.]+)\s+ms', 'insert_btree_commit_total_ms')
     grab(r'shell db close:\s*([\d.]+)\s+ms', 'shell_close_ms')
     grab(r'shell statements:\s*(\d+)', 'shell_stmt_count', int)
     grab(r'shell prepare:\s*([\d.]+)\s+ms', 'shell_prepare_ms')
@@ -707,28 +711,41 @@ def run_one_config(label, shell, compact_bin, insert_sql_path, query_sql_path,
             )
         if ins_stats.get('build_total_ms') is not None:
             stmt_s = ins_stats.get('insert_stmt_total_ms', 0) / 1000
+            commit_s = ins_stats.get(
+                'insert_kv_commit_no_lsm_ms',
+                ins_stats.get(
+                    'insert_btree_commit_total_ms',
+                    ins_stats.get('insert_stmt_finish_ms', 0)
+                )
+            ) / 1000
             finish_s = ins_stats.get('insert_stmt_finish_ms', 0) / 1000
+            commit_total_s = ins_stats.get('insert_kv_commit_total_ms', 0) / 1000
+            commit_lsm_s = ins_stats.get('insert_kv_commit_lsm_ms', 0) / 1000
             wal_s = ins_stats.get('step_wal_ms', 0) / 1000
             build_s = ins_stats.get('build_total_ms', 0) / 1000
             shadow_s = ins_stats.get('shadow_insert_ms', 0) / 1000
             graph_s = ins_stats.get('graph_build_ms', 0) / 1000
             traversal_s = ins_stats.get('build_traversal_ms', 0) / 1000
             edge_update_s = ins_stats.get('build_edge_update_ms', 0) / 1000
-            read_s = ins_stats.get('build_read_ms', 0) / 1000
-            write_s = ins_stats.get('build_write_ms', 0) / 1000
             dist_s = ins_stats.get('build_dist_ms', 0) / 1000
             lsm_compact_s = ins_stats.get('insert_lsm_compact_ms', 0) / 1000
             pg_comp_s = ins_stats.get('lsm_page_compress_ms', 0) / 1000
             pg_decomp_s = ins_stats.get('lsm_page_decompress_ms', 0) / 1000
             print(
-                f"        Stmt={stmt_s:.1f}s  Commit={finish_s:.1f}s  "
+                f"        Stmt={stmt_s:.1f}s  Commit={commit_s:.1f}s  "
                 f"Checkpt={wal_s:.1f}s  VecBuild={build_s:.1f}s  "
                 f"Shadow={shadow_s:.1f}s  GraphBuild={graph_s:.1f}s  "
                 f"BuildTrav={traversal_s:.1f}s  EdgeUpd={edge_update_s:.1f}s  "
-                f"ReadPath={read_s:.1f}s  WritePath={write_s:.1f}s  Dist={dist_s:.1f}s  "
-                f"LSMComp={lsm_compact_s:.1f}s  PgComp={pg_comp_s:.1f}s  "
+                f"Dist={dist_s:.1f}s  LSMComp={lsm_compact_s:.1f}s  PgComp={pg_comp_s:.1f}s  "
                 f"PgDecomp={pg_decomp_s:.1f}s"
             )
+            if ins_stats.get('insert_kv_commit_total_ms') is not None:
+                print(
+                    f"        Finish={finish_s:.1f}s  CommitTotal={commit_total_s:.1f}s  "
+                    f"CommitLSM={commit_lsm_s:.1f}s"
+                )
+            elif ins_stats.get('insert_btree_commit_total_ms') is not None:
+                print(f"        Finish={finish_s:.1f}s")
             if ins_stats.get('step_api_ms') is not None:
                 print(
                     f"        StepApi={ins_stats.get('step_api_ms', 0)/1000:.1f}s  "
@@ -823,7 +840,6 @@ def run_one_config(label, shell, compact_bin, insert_sql_path, query_sql_path,
             f"        SearchTotal={q_stats.get('search_total_ms', 0):.0f}ms  "
             f"CtxInit={q_stats.get('ctx_init_ms', 0):.0f}ms  "
             f"Graph={q_stats.get('graph_ms', 0):.0f}ms  "
-            f"ReadPath={q_stats.get('query_read_ms', 0):.0f}ms  "
             f"QueryDist={q_stats.get('query_dist_ms', 0):.0f}ms  "
             f"Result={q_stats.get('result_ms', 0):.0f}ms  "
             f"CtxDeinit={q_stats.get('ctx_deinit_ms', 0):.0f}ms"
@@ -1027,23 +1043,22 @@ def main():
         ins_hdr = (
             f"{'Overall':>8} {'Stmt':>8} {'Commit':>8} {'Checkpt':>8} "
             f"{'VecBuild':>8} {'Shadow':>8} {'Trav':>8} {'EdgeUpd':>8} "
-            f"{'ReadPath':>8} "
-            f"{'WritePath':>9} {'Dist':>8} {'LSMComp':>8} {'PgComp':>8} {'PgDecomp':>8}"
+            f"{'Dist':>8} {'LSMComp':>8} {'PgComp':>8} {'PgDecomp':>8}"
         )
         ins_sub = (
             f"{'(s)':>8} {'(s)':>8} {'(s)':>8} {'(s)':>8} "
             f"{'(s)':>8} {'(s)':>8} {'(s)':>8} {'(s)':>8} "
-            f"{'(s)':>8} {'(s)':>9} {'(s)':>8} {'(s)':>8} {'(s)':>8} {'(s)':>8}"
+            f"{'(s)':>8} {'(s)':>8} {'(s)':>8} {'(s)':>8}"
         )
         if show_compact:
             ins_hdr += f" {'Compact':>8}"
             ins_sub += f" {'(s)':>8}"
         q_hdr = (
-            f"{'Overall':>8} {'Graph':>8} {'ReadPath':>8} {'Dist':>8} "
+            f"{'Overall':>8} {'Graph':>8} {'Dist':>8} "
             f"{'Result':>8} {'PgComp':>8} {'PgDecomp':>8} {'Q/s':>8} {'Recall':>8}"
         )
         q_sub = (
-            f"{'(s)':>8} {'(ms)':>8} {'(ms)':>8} {'(ms)':>8} {'(ms)':>8} "
+            f"{'(s)':>8} {'(ms)':>8} {'(ms)':>8} {'(ms)':>8} "
             f"{'(ms)':>8} {'(ms)':>8} {'':>8} {'@k':>8}"
         )
         hdr = f"{'Config':>16} |{ins_hdr} |{q_hdr} | {'Size':>8}"
@@ -1063,14 +1078,18 @@ def main():
             short_label = r['label'].replace(f"{ds_name}_", "")
             ist = r.get('ins_stats', {})
             stmt_s = ist.get('insert_stmt_total_ms', 0) / 1000
-            finish_s = ist.get('insert_stmt_finish_ms', 0) / 1000
+            finish_s = ist.get(
+                'insert_kv_commit_no_lsm_ms',
+                ist.get(
+                    'insert_btree_commit_total_ms',
+                    ist.get('insert_stmt_finish_ms', 0)
+                )
+            ) / 1000
             wal_s = ist.get('step_wal_ms', 0) / 1000
             build_s = ist.get('build_total_ms', 0) / 1000
             shadow_s = ist.get('shadow_insert_ms', 0) / 1000
             traversal_s = ist.get('build_traversal_ms', 0) / 1000
             edge_update_s = ist.get('build_edge_update_ms', 0) / 1000
-            read_s = ist.get('build_read_ms', 0) / 1000
-            write_s = ist.get('build_write_ms', 0) / 1000
             dist_s = ist.get('build_dist_ms', 0) / 1000
             lsm_compact_s = ist.get('insert_lsm_compact_ms', 0) / 1000
             pg_comp_s = ist.get('lsm_page_compress_ms', 0) / 1000
@@ -1080,8 +1099,7 @@ def main():
                         f"{stmt_s:>8.1f} {finish_s:>8.1f} {wal_s:>8.1f} "
                         f"{build_s:>8.1f} "
                         f"{shadow_s:>8.1f} {traversal_s:>8.1f} {edge_update_s:>8.1f} "
-                        f"{read_s:>8.1f} "
-                        f"{write_s:>9.1f} {dist_s:>8.1f} {lsm_compact_s:>8.1f} "
+                        f"{dist_s:>8.1f} {lsm_compact_s:>8.1f} "
                         f"{pg_comp_s:>8.1f} {pg_decomp_s:>8.1f}")
             if show_compact:
                 compact_str = f"{r['compact_time_s']:>8.1f}" if r['compact_time_s'] > 0 else f"{'---':>8}"
@@ -1089,7 +1107,6 @@ def main():
             q_vals = (
                 f"{r['query_time_s']:>8.1f} "
                 f"{qst.get('graph_ms', 0):>8.1f} "
-                f"{qst.get('query_read_ms', 0):>8.1f} "
                 f"{qst.get('query_dist_ms', 0):>8.1f} "
                 f"{qst.get('result_ms', 0):>8.1f} "
                 f"{qst.get('lsm_page_compress_ms', 0):>8.1f} "

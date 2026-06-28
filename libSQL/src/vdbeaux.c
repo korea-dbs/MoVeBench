@@ -14,10 +14,19 @@
 */
 #include "sqliteInt.h"
 #include "vdbeInt.h"
+#include <sys/time.h>
 
 #ifndef SQLITE_OMIT_VECTOR
 #include "vectorIndexInt.h"
 #endif
+
+double g_btreeCommitTotalMs = 0.0;
+
+static double btreeCommitNowMs(void){
+  struct timeval tv;
+  gettimeofday(&tv, 0);
+  return (double)tv.tv_sec*1000.0 + (double)tv.tv_usec/1000.0;
+}
 
 /* Forward references */
 static void freeEphemeralFunction(sqlite3 *db, FuncDef *pDef);
@@ -2988,6 +2997,7 @@ static int vdbeCommit(sqlite3 *db, Vdbe *p){
   if( 0==sqlite3Strlen30(sqlite3BtreeGetFilename(db->aDb[0].pBt))
    || nTrans<=1
   ){
+    double commitStartMs = btreeCommitNowMs();
     for(i=0; rc==SQLITE_OK && i<db->nDb; i++){
       Btree *pBt = db->aDb[i].pBt;
       if( pBt ){
@@ -3006,6 +3016,7 @@ static int vdbeCommit(sqlite3 *db, Vdbe *p){
         rc = sqlite3BtreeCommitPhaseTwo(pBt, 0);
       }
     }
+    g_btreeCommitTotalMs += btreeCommitNowMs() - commitStartMs;
     if( rc==SQLITE_OK ){
       sqlite3VtabCommit(db);
     }
@@ -3025,6 +3036,7 @@ static int vdbeCommit(sqlite3 *db, Vdbe *p){
     int res;
     int retryCount = 0;
     int nMainFile;
+    double commitStartMs = btreeCommitNowMs();
 
     /* Select a super-journal file name */
     nMainFile = sqlite3Strlen30(zMainFile);
@@ -3150,6 +3162,7 @@ static int vdbeCommit(sqlite3 *db, Vdbe *p){
         sqlite3BtreeCommitPhaseTwo(pBt, 1);
       }
     }
+    g_btreeCommitTotalMs += btreeCommitNowMs() - commitStartMs;
     sqlite3EndBenignMalloc();
     enable_simulated_io_errors();
 
