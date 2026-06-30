@@ -125,7 +125,7 @@ python3 pixel_benchmark.py --adb-serial 2B261FDH200B0M --datasets sift --page-si
 
 ---
 
-### Other Configurations
+### LSM Configurations
 
 The following table shows the adjustable LSM configurations of SQLite4.
 
