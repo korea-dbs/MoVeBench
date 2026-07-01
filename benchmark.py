@@ -481,6 +481,12 @@ def load_groundtruth(path):
     return results
 
 
+def config_label(name, page_size_kb, include_page_size=False):
+    if include_page_size:
+        return f"{name}_{page_size_kb}kb"
+    return name
+
+
 def file_size_mb(path):
     try:
         return os.path.getsize(path) / (1024 * 1024)
@@ -923,6 +929,7 @@ def main():
 
     page_sizes_kb = [int(x) for x in args.page_sizes.split(",")]
     dataset_names = [x.strip() for x in args.datasets.split(",")]
+    include_page_size_in_label = len(page_sizes_kb) > 1
     if args.lsm_autoflush_mb is not None and args.lsm_autoflush_mb <= 0:
         print("Error: --lsm-autoflush-mb must be positive.")
         return 1
@@ -962,7 +969,8 @@ def main():
                 print("Warning: compact_db unavailable, skipping LSMoVe configs")
             else:
                 for ps_kb in page_sizes_kb:
-                    configs.append((f"lsm_{ps_kb}kb", shell, compact_bin, False, ps_kb))
+                    label = config_label("LSMoVe", ps_kb, include_page_size_in_label)
+                    configs.append((label, shell, compact_bin, False, ps_kb))
 
     if args.sqlite3_dir:
         shell = os.path.join(args.sqlite3_dir, "sqlite3")
@@ -970,7 +978,8 @@ def main():
             print("Warning: sqlite3 binary missing, skipping sqlite3 configs")
         else:
             for ps_kb in page_sizes_kb:
-                configs.append((f"sqlite3_{ps_kb}kb", shell, None, True, ps_kb))
+                label = config_label("libSQL", ps_kb, include_page_size_in_label)
+                configs.append((label, shell, None, True, ps_kb))
 
     if not configs:
         print("Error: no valid configurations found.")
@@ -1054,11 +1063,11 @@ def main():
             ins_hdr += f" {'Compact':>8}"
             ins_sub += f" {'(s)':>8}"
         q_hdr = (
-            f"{'Overall':>8} {'Graph':>8} {'Dist':>8} "
+            f"{'Overall':>8} {'Graph':>8} {'ReadPath':>8} {'Dist':>8} "
             f"{'Result':>8} {'PgComp':>8} {'PgDecomp':>8} {'Q/s':>8} {'Recall':>8}"
         )
         q_sub = (
-            f"{'(s)':>8} {'(ms)':>8} {'(ms)':>8} {'(ms)':>8} "
+            f"{'(s)':>8} {'(ms)':>8} {'(ms)':>8} {'(ms)':>8} {'(ms)':>8} "
             f"{'(ms)':>8} {'(ms)':>8} {'':>8} {'@k':>8}"
         )
         hdr = f"{'Config':>16} |{ins_hdr} |{q_hdr} | {'Size':>8}"
@@ -1107,6 +1116,7 @@ def main():
             q_vals = (
                 f"{r['query_time_s']:>8.1f} "
                 f"{qst.get('graph_ms', 0):>8.1f} "
+                f"{qst.get('query_read_ms', 0):>8.1f} "
                 f"{qst.get('query_dist_ms', 0):>8.1f} "
                 f"{qst.get('result_ms', 0):>8.1f} "
                 f"{qst.get('lsm_page_compress_ms', 0):>8.1f} "

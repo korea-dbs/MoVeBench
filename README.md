@@ -158,7 +158,7 @@ Detailed profiling outputs including per-phase timing and I/O statistics are ava
 
 <table>
   <tr>
-    <th></th><th colspan="2">NVIDIA Jetson AGX</th><th colspan="2">Google Pixel 7</th>
+    <th></th><th colspan="2">NVIDIA Jetson AGX Orin</th><th colspan="2">Google Pixel 7</th>
   </tr>
   <tr>
     <th>Dataset</th><th>LSMoVe(4KB)</th><th>libSQL(4KB)</th><th>LSMoVe(4KB)</th><th>libSQL(4KB)</th>
@@ -181,7 +181,7 @@ Detailed profiling outputs including per-phase timing and I/O statistics are ava
 
 <table>
   <tr>
-    <th></th><th colspan="2">NVIDIA Jetson AGX</th><th colspan="2">Google Pixel 7</th>
+    <th></th><th colspan="2">NVIDIA Jetson AGX Orin</th><th colspan="2">Google Pixel 7</th>
   </tr>
   <tr>
     <th>Dataset</th><th>LSMoVe(4KB)</th><th>libSQL(4KB)</th><th>LSMoVe(4KB)</th><th>libSQL(4KB)</th>
@@ -202,7 +202,7 @@ Detailed profiling outputs including per-phase timing and I/O statistics are ava
 
 <table>
   <tr>
-    <th></th><th colspan="2">NVIDIA Jetson AGX</th><th colspan="2">Google Pixel 7</th>
+    <th></th><th colspan="2">NVIDIA Jetson AGX Orin</th><th colspan="2">Google Pixel 7</th>
   </tr>
   <tr>
     <th>Dataset</th><th>libSQL(4KB)</th><th>LSMoVe(4KB)</th><th>LSMoVe(4KB)</th><th>libSQL(4KB)</th>
@@ -223,7 +223,7 @@ Detailed profiling outputs including per-phase timing and I/O statistics are ava
 
 <table>
   <tr>
-    <th></th><th colspan="2">NVIDIA Jetson AGX</th><th colspan="2">Google Pixel 7</th>
+    <th></th><th colspan="2">NVIDIA Jetson AGX Orin</th><th colspan="2">Google Pixel 7</th>
   </tr>
   <tr>
     <th>Dataset</th><th>libSQL(4KB)</th><th>LSMoVe(4KB)</th><th>LSMoVe(4KB)</th><th>libSQL(4KB)</th>

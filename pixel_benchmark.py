@@ -393,6 +393,12 @@ def load_groundtruth(path):
     return results
 
 
+def config_label(name, page_size_kb, include_page_size=False):
+    if include_page_size:
+        return f"{name}_{page_size_kb}kb"
+    return name
+
+
 def parse_diskann_stats(stderr_text):
     stats = {}
     def grab(pattern, key, conv=float):
@@ -794,6 +800,7 @@ def main():
     page_sizes_kb  = [int(x) for x in args.page_sizes.split(",")]
     dataset_names  = [x.strip() for x in args.datasets.split(",")]
     use_compaction = bool(args.lsm_use_compaction)
+    include_page_size_in_label = len(page_sizes_kb) > 1
 
     if args.lsm_autoflush_mb is not None and args.lsm_autoflush_mb <= 0:
         print("Error: --lsm-autoflush-mb must be positive.")
@@ -831,7 +838,8 @@ def main():
             r2 = adb_shell(f"test -x {compact_bin} && echo OK", serial=serial)
             cb = compact_bin if "OK" in r2.stdout else None
             for ps_kb in page_sizes_kb:
-                configs.append((f"lsm_{ps_kb}kb", shell_bin, cb, False, ps_kb))
+                label = config_label("LSMoVe", ps_kb, include_page_size_in_label)
+                configs.append((label, shell_bin, cb, False, ps_kb))
 
     if args.sqlite3_dir:
         shell_bin = f"{args.sqlite3_dir}/sqlite3"
@@ -840,7 +848,8 @@ def main():
             print(f"Warning: {shell_bin} not found on device, skipping sqlite3 configs")
         else:
             for ps_kb in page_sizes_kb:
-                configs.append((f"sqlite3_{ps_kb}kb", shell_bin, None, True, ps_kb))
+                label = config_label("libSQL", ps_kb, include_page_size_in_label)
+                configs.append((label, shell_bin, None, True, ps_kb))
 
     if not configs:
         print("Error: no valid configurations found.")
@@ -900,13 +909,12 @@ def main():
         ins_hdr = (
             f"{'Overall':>8} {'Stmt':>8} {'Commit':>8} {'Checkpt':>8} "
             f"{'VecBuild':>8} {'Shadow':>8} {'Trav':>8} {'EdgeUpd':>8} "
-            f"{'ReadPath':>8} {'WritePath':>9} {'Dist':>8} {'LSMComp':>8} "
-            f"{'PgComp':>8} {'PgDecomp':>8}"
+            f"{'Dist':>8} {'LSMComp':>8} {'PgComp':>8} {'PgDecomp':>8}"
         )
         ins_sub = (
             f"{'(s)':>8} {'(s)':>8} {'(s)':>8} {'(s)':>8} "
             f"{'(s)':>8} {'(s)':>8} {'(s)':>8} {'(s)':>8} "
-            f"{'(s)':>8} {'(s)':>9} {'(s)':>8} {'(s)':>8} {'(s)':>8} {'(s)':>8}"
+            f"{'(s)':>8} {'(s)':>8} {'(s)':>8} {'(s)':>8}"
         )
         if show_compact:
             ins_hdr += f" {'Compact':>8}"
@@ -945,8 +953,6 @@ def main():
                 f"{ist.get('shadow_insert_ms',0)/1000:>8.1f} "
                 f"{ist.get('build_traversal_ms',0)/1000:>8.1f} "
                 f"{ist.get('build_edge_update_ms',0)/1000:>8.1f} "
-                f"{ist.get('build_read_ms',0)/1000:>8.1f} "
-                f"{ist.get('build_write_ms',0)/1000:>9.1f} "
                 f"{ist.get('build_dist_ms',0)/1000:>8.1f} "
                 f"{ist.get('insert_lsm_compact_ms',0)/1000:>8.1f} "
                 f"{ist.get('lsm_page_compress_ms',0)/1000:>8.1f} "
