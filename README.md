@@ -149,42 +149,93 @@ The following table shows the adjustable LSM configurations of SQLite4.
 
 ## Results
 
-The following results were obtained on a **Google Pixel** device (disk: `sda`) using `pixel_benchmark.py`, with a 4KB SQLite page size and no compaction.
+The following results were obtained on a **NVIDIA Jetson AGX** and **Google Pixel 7** device using `benchmark.py` / `pixel_benchmark.py` each, with a 4KB SQLite page size and no compaction.
 
-Detailed profiling output including per-phase timing and I/O statistics is available in [`pixel_output.txt`](./result_examples/pixel_output.txt).
+Detailed profiling outputs including per-phase timing and I/O statistics are available in [`./result_examples`](./result_examples/) directory.
+
 
 ### Insert Time (s)
 
-| Dataset | LSMoVe (4KB) | libSQL (4KB) |
-|---------|-------------:|-------------:|
-| SIFT    | 184.8        | 611.7        |
-| GloVe   | 212.7        | 653.7        |
-| COCO    | 593.6        | 959.1        |
-| Cohere  | 733.0        | 1084.2       |
+<table>
+  <tr>
+    <th></th><th colspan="2">NVIDIA Jetson AGX</th><th colspan="2">Google Pixel 7</th>
+  </tr>
+  <tr>
+    <th>Dataset</th><th>LSMoVe(4KB)</th><th>libSQL(4KB)</th><th>LSMoVe(4KB)</th><th>libSQL(4KB)</th>
+  </tr>
+  <tr>
+    <td>SIFT</td> <td>455.1</td> <td>807.7</td> <td>184.8</td> <td>212.7</td>
+  </tr>
+  <tr>
+    <td>GloVe</td> <td>612.2</td> <td>1072.3</td> <td>212.7</td> <td>653.7</td>
+  </tr>
+  <tr>
+    <td>COCO</td> <td>1357.5</td> <td>2302.9</td> <td>593.6</td> <td>959.1</td>
+  </tr>
+    <td>Cohere</td> <td>1522.1</td> <td>2559.8</td> <td>733.0</td> <td>1084.2</td>
+</table>
+
 
 ### Search Time (s) & Throughput (Q/s)
 
-| Dataset | LSMoVe (4KB) | Q/s | libSQL (4KB) | Q/s |
-|---------|-------------:|----:|-------------:|----:|
-| SIFT    | 43.0         | 233 | 83.3         | 120 |
-| GloVe   | 47.8         | 209 | 84.0         | 119 |
-| COCO    | 71.2         | 140 | 80.2         | 125 |
-| Cohere  | 104.2        |  96 | 166.4        |  60 |
 
-### Recall@10
+<table>
+  <tr>
+    <th></th><th colspan="2">NVIDIA Jetson AGX</th><th colspan="2">Google Pixel 7</th>
+  </tr>
+  <tr>
+    <th>Dataset</th><th>LSMoVe(4KB)</th><th>libSQL(4KB)</th><th>LSMoVe(4KB)</th><th>libSQL(4KB)</th>
+  </tr>
+  <tr>
+    <td>SIFT</td> <td>60.6 (165 Q/s)</td> <td>92.0 (109 Q/s)</td> <td>43.0 (233 Q/s)</td> <td>83.3 (120 Q/s)</td>
+  </tr>
+  <tr>
+    <td>GloVe</td> <td>77.8 (128)</td> <td>105.8 (94)</td> <td>47.8 (209)</td> <td>84.0 (119)</td>
+  </tr>
+  <tr>
+    <td>COCO</td> <td>125.9 (79)</td> <td>140.6 (71)</td> <td>71.2 (140)</td> <td>80.2 (125)</td>
+  </tr>
+    <td>Cohere</td> <td>176.0 (57)</td> <td>260.0 (38)</td> <td>104.2 (96)</td> <td>166.4 (60)</td>
+</table>
 
-| Dataset | LSMoVe (4KB) | libSQL (4KB) |
-|---------|-------------:|-------------:|
-| SIFT    | 98.68%       | 98.71%       |
-| GloVe   | 71.12%       | 71.04%       |
-| COCO    | 95.02%       | 94.98%       |
-| Cohere  | 91.69%       | 91.73%       |
+### Recall@10 %
+
+<table>
+  <tr>
+    <th></th><th colspan="2">NVIDIA Jetson AGX</th><th colspan="2">Google Pixel 7</th>
+  </tr>
+  <tr>
+    <th>Dataset</th><th>libSQL(4KB)</th><th>LSMoVe(4KB)</th><th>LSMoVe(4KB)</th><th>libSQL(4KB)</th>
+  </tr>
+  <tr>
+    <td>SIFT</td> <td>98.69%</td> <td>98.70%</td> <td>98.68%</td> <td>98.71%</td>
+  </tr>
+  <tr>
+    <td>GloVe</td> <td>70.91%</td> <td>71.00%</td> <td>71.12%</td> <td>71.04%</td>
+  </tr>
+  <tr>
+    <td>COCO</td> <td>95.01%</td> <td>95.00%</td> <td>95.02%</td> <td>94.98%</td>
+  </tr>
+    <td>Cohere</td> <td>91.65%</td> <td>91.71%</td> <td>91.69%</td> <td>91.73%</td>
+</table>
 
 ### DB Size (MB)
 
-| Dataset | LSMoVe (4KB) | libSQL (4KB) |
-|---------|-------------:|-------------:|
-| SIFT    | 1253.0       | 448.8        |
-| GloVe   | 1559.0       | 600.7        |
-| COCO    | 8092.0       | 1620.7       |
-| Cohere  | 6967.0       | 2346.9       |
+<table>
+  <tr>
+    <th></th><th colspan="2">NVIDIA Jetson AGX</th><th colspan="2">Google Pixel 7</th>
+  </tr>
+  <tr>
+    <th>Dataset</th><th>libSQL(4KB)</th><th>LSMoVe(4KB)</th><th>LSMoVe(4KB)</th><th>libSQL(4KB)</th>
+  </tr>
+  <tr>
+    <td>SIFT</td> <td>1253.0</td> <td>448.8</td> <td>1253.0</td> <td>448.8</td>
+  </tr>
+  <tr>
+    <td>GloVe</td> <td>1563.0</td> <td>600.7</td> <td>1559.0</td> <td>600.7</td>
+  </tr>
+  <tr>
+    <td>COCO</td> <td>8099.0</td> <td>1620.7</td> <td>8092.0</td> <td>1620.7</td>
+  </tr>
+    <td>Cohere</td> <td>6969.0</td> <td>2346.9</td> <td>6967.0</td> <td>2346.9</td>
+</table>
