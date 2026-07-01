@@ -151,7 +151,7 @@ The following table shows the adjustable LSM configurations of SQLite4.
 
 The following results were obtained on a **Google Pixel** device (disk: `sda`) using `pixel_benchmark.py`, with a 4KB SQLite page size and no compaction.
 
-Detailed profiling output including per-phase timing and I/O statistics is available in [`pixel_output.txt`](./example/pixel_output.txt).
+Detailed profiling output including per-phase timing and I/O statistics is available in [`pixel_output.txt`](./result_examples/pixel_output.txt).
 
 ### Insert Time (s)
 
